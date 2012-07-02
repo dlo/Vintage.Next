@@ -40,7 +40,7 @@ def update_status_line(view):
         elif view.has_non_empty_selection_region():
             desc = ['VISUAL MODE']
         else:
-            desc = ['COMMAND MODE']
+            desc = ['NORMAL MODE']
             if g_input_state.action_command is not None:
                 if g_input_state.action_description:
                     desc.append(g_input_state.action_description)
