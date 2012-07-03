@@ -14,7 +14,7 @@ g_registers = {}
 # * set_action
 # * set_motion
 # * push_repeat_digit
-class InputState:
+class InputState(object):
     prefix_repeat_digits = []
     action_command = None
     action_command_args = None
@@ -28,63 +28,62 @@ class InputState:
     motion_clip_to_line = False
     register = None
 
-g_input_state = InputState()
+    def set_motion_mode(self, view, mode):
+        self.motion_mode = mode
+        self.update_status_line(view)
 
-# Updates the status bar to reflect the current mode and input state
-def update_status_line(view):
-    desc = []
+    def reset(self, view, reset_motion_mode = True):
+        self.prefix_repeat_digits = []
+        self.action_command = None
+        self.action_command_args = None
+        self.action_description = None
+        self.motion_repeat_digits = []
+        self.motion_command = None
+        self.motion_mode_overridden = False
+        self.motion_command_args = None
+        self.motion_inclusive = False
+        self.motion_clip_to_line = False
+        self.register = None
+        if reset_motion_mode:
+            self.set_motion_mode(view, MOTION_MODE_NORMAL)
 
-    if view.settings().get('command_mode'):
-        if g_input_state.motion_mode == MOTION_MODE_LINE:
-            desc = ['VISUAL LINE MODE']
-        elif view.has_non_empty_selection_region():
-            desc = ['VISUAL MODE']
+    # Updates the status bar to reflect the current mode and input state
+    def update_status_line(self, view):
+        desc = []
+
+        if view.settings().get('command_mode'):
+            if self.motion_mode == MOTION_MODE_LINE:
+                desc = ['VISUAL LINE MODE']
+            elif view.has_non_empty_selection_region():
+                desc = ['VISUAL MODE']
+            else:
+                desc = ['NORMAL MODE']
+                if self.action_command is not None:
+                    if self.action_description:
+                        desc.append(self.action_description)
+                    else:
+                        desc.append(self.action_command)
+
+                repeat = (digits_to_number(self.prefix_repeat_digits)
+                    * digits_to_number(self.motion_repeat_digits))
+                if repeat != 1:
+                    if self.action_command is not None:
+                        desc[-1] += " * " + str(repeat)
+                    else:
+                        desc.append("* " + str(repeat))
+
+            if self.register is not None:
+                desc.insert(1, 'Register "' + self.register + '"')
         else:
-            desc = ['NORMAL MODE']
-            if g_input_state.action_command is not None:
-                if g_input_state.action_description:
-                    desc.append(g_input_state.action_description)
-                else:
-                    desc.append(g_input_state.action_command)
+            desc = ['INSERT MODE']
 
-            repeat = (digits_to_number(g_input_state.prefix_repeat_digits)
-                * digits_to_number(g_input_state.motion_repeat_digits))
-            if repeat != 1:
-                if g_input_state.action_command is not None:
-                    desc[-1] += " * " + str(repeat)
-                else:
-                    desc.append("* " + str(repeat))
+        view.set_status('mode', ' - '.join(desc))
 
-        if g_input_state.register is not None:
-            desc.insert(1, 'Register "' + g_input_state.register + '"')
-    else:
-        desc = ['INSERT MODE']
-
-    view.set_status('mode', ' - '.join(desc))
-
-def set_motion_mode(view, mode):
-    g_input_state.motion_mode = mode
-    update_status_line(view)
-
-def reset_input_state(view, reset_motion_mode = True):
-    global g_input_state
-    g_input_state.prefix_repeat_digits = []
-    g_input_state.action_command = None
-    g_input_state.action_command_args = None
-    g_input_state.action_description = None
-    g_input_state.motion_repeat_digits = []
-    g_input_state.motion_command = None
-    g_input_state.motion_mode_overridden = False
-    g_input_state.motion_command_args = None
-    g_input_state.motion_inclusive = False
-    g_input_state.motion_clip_to_line = False
-    g_input_state.register = None
-    if reset_motion_mode:
-        set_motion_mode(view, MOTION_MODE_NORMAL)
+g_input_state = InputState()
 
 class ViCancelCurrentAction(sublime_plugin.TextCommand):
     def run(self, action, action_args = {}, motion_mode = None, description = None):
-        reset_input_state(self.view, True)
+        g_input_state.reset(self.view, True)
 
 def string_to_motion_mode(mode):
     if mode == 'normal':
@@ -112,13 +111,13 @@ class InputStateTracker(sublime_plugin.EventListener):
                 if v.settings().get("vintage_start_in_command_mode"):
                     v.settings().set('command_mode', True)
                     v.settings().set('inverse_caret_state', True)
-                update_status_line(v)
+                g_input_state.update_status_line(v)
 
     def on_activated(self, view):
-        reset_input_state(view)
+        g_input_state.reset(view)
 
     def on_deactivated(self, view):
-        reset_input_state(view)
+        g_input_state.reset(view)
 
         # Ensure that insert mode actions will no longer be grouped, otherwise
         # it can lead to the impression that too much is undone at once
@@ -130,13 +129,13 @@ class InputStateTracker(sublime_plugin.EventListener):
         view.run_command('unmark_undo_groups_for_gluing')
 
     def on_selection_modified(self, view):
-        reset_input_state(view, False)
+        g_input_state.reset(view, False)
         # Get out of visual line mode if the selection has changed, e.g., due
         # to clicking with the mouse
         if (g_input_state.motion_mode == MOTION_MODE_LINE and
             not view.has_non_empty_selection_region()):
             g_input_state.motion_mode = MOTION_MODE_NORMAL
-        update_status_line(view)
+        g_input_state.update_status_line(view)
 
     def on_load(self, view):
         if view.settings().get("vintage_start_in_command_mode"):
@@ -216,7 +215,7 @@ def eval_input(view):
 
     reset_motion_mode = (g_input_state.action_command is not None)
 
-    reset_input_state(view, reset_motion_mode)
+    g_input_state.reset(view, reset_motion_mode)
 
     view.run_command('vi_eval', cmd_args)
 
@@ -234,7 +233,7 @@ class PushRepeatDigit(sublime_plugin.TextCommand):
             g_input_state.motion_repeat_digits.append(digit)
         else:
             g_input_state.prefix_repeat_digits.append(digit)
-        update_status_line(self.view)
+        g_input_state.update_status_line(self.view)
 
 # Set the current action in the input state. Note that this won't create an
 # entry on the undo stack: only eval_input does this.
@@ -258,7 +257,7 @@ class SetAction(sublime_plugin.TextCommand):
             # eval the current input
             eval_input(self.view)
         else:
-            update_status_line(self.view)
+            g_input_state.update_status_line(self.view)
 
 def digits_to_number(digits):
     if len(digits) == 0:
@@ -301,7 +300,7 @@ class SetMotion(sublime_plugin.TextCommand):
         if mode is not None:
             m = string_to_motion_mode(mode)
             if m != -1:
-                set_motion_mode(self.view, m)
+                g_input_state.set_motion_mode(self.view, m)
             else:
                 print "invalid motion mode:", mode
 
@@ -344,7 +343,7 @@ class SetMotionMode(sublime_plugin.TextCommand):
         m = string_to_motion_mode(mode)
 
         if m != -1:
-            set_motion_mode(self.view, m)
+            g_input_state.set_motion_mode(self.view, m)
             g_input_state.motion_mode_overridden = True
         else:
             print "invalid motion mode"
@@ -355,7 +354,7 @@ class SetRegister(sublime_plugin.TextCommand):
 
     def run(self, character):
         g_input_state.register = character
-        update_status_line(self.view)
+        g_input_state.update_status_line(self.view)
 
 def clip_point_to_line(view, f, pt):
     l = view.line(pt)
@@ -657,9 +656,11 @@ class EnterInsertMode(sublime_plugin.TextCommand):
             args.update({'register': register})
             self.view.run_command(insert_command, args)
 
+        g_input_state.mode = MODE_INSERT
+
         self.view.settings().set('command_mode', False)
         self.view.settings().set('inverse_caret_state', False)
-        update_status_line(self.view)
+        g_input_state.update_status_line(self.view)
 
 class ExitInsertMode(sublime_plugin.TextCommand):
     def run_(self, args):
@@ -674,19 +675,24 @@ class ExitInsertMode(sublime_plugin.TextCommand):
         self.view.run_command('glue_marked_undo_groups')
 
     def run(self, edit):
+        g_input_state.mode = MODE_NORMAL
+
         self.view.settings().set('command_mode', True)
         self.view.settings().set('inverse_caret_state', True)
 
         if not self.view.has_non_empty_selection_region():
             self.view.run_command('vi_move_by_characters_in_line', {'forward': False})
 
-        update_status_line(self.view)
+        g_input_state.update_status_line(self.view)
 
 class EnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command('mark_undo_groups_for_gluing')
+
+        g_input_state.mode = MODE_VISUAL
+
         if g_input_state.motion_mode != MOTION_MODE_NORMAL:
-            set_motion_mode(self.view, MOTION_MODE_NORMAL)
+            g_input_state.set_motion_mode(self.view, MOTION_MODE_NORMAL)
 
         transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
@@ -694,18 +700,18 @@ class ExitVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, toggle = False):
         if toggle:
             if g_input_state.motion_mode != MOTION_MODE_NORMAL:
-                set_motion_mode(self.view, MOTION_MODE_NORMAL)
+                g_input_state.set_motion_mode(self.view, MOTION_MODE_NORMAL)
             else:
                 self.view.run_command('shrink_selections')
         else:
-            set_motion_mode(self.view, MOTION_MODE_NORMAL)
+            g_input_state.set_motion_mode(self.view, MOTION_MODE_NORMAL)
             self.view.run_command('shrink_selections')
 
         self.view.run_command('unmark_undo_groups_for_gluing')
 
 class EnterVisualLineMode(sublime_plugin.TextCommand):
     def run(self, edit):
-        set_motion_mode(self.view, MOTION_MODE_LINE)
+        g_input_state.set_motion_mode(self.view, MOTION_MODE_LINE)
         expand_to_full_line(self.view)
         self.view.run_command('maybe_mark_undo_groups_for_gluing')
 
