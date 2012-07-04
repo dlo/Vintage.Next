@@ -4,14 +4,14 @@ from vintage import transform_selection
 from vintage import transform_selection_regions
 
 class ViSpanCountLines(sublime_plugin.TextCommand):
-    def run(self, edit, repeat = 1):
+    def run(self, edit, repeat=1):
         for i in xrange(repeat - 1):
             self.view.run_command('move', {'by': 'lines',
                                            'extend': True,
                                            'forward': True})
 
 class ViMoveByCharactersInLine(sublime_plugin.TextCommand):
-    def run(self, edit, forward = True, extend = False, visual = False):
+    def run(self, edit, forward=True, extend=False, visual=False):
         delta = 1 if forward else -1
 
         transform_selection(self.view, lambda pt: pt + delta, extend=extend,
@@ -25,13 +25,13 @@ class ViMoveByCharacters(sublime_plugin.TextCommand):
 
         return pt
 
-    def run(self, edit, forward = True, extend = False, visual = False):
+    def run(self, edit, forward=True, extend=False, visual=False):
         delta = 1 if forward else -1
         transform_selection(self.view, lambda pt: self.advance(delta, visual, pt),
             extend=extend)
 
 class ViMoveToHardEol(sublime_plugin.TextCommand):
-    def run(self, edit, repeat = 1, extend = False):
+    def run(self, edit, repeat=1, extend=False):
         repeat = int(repeat)
         if repeat > 1:
             for i in xrange(repeat - 1):
@@ -55,7 +55,7 @@ class ViMoveToFirstNonWhiteSpaceCharacter(sublime_plugin.TextCommand):
 
         return l.a + offset
 
-    def run(self, edit, repeat = 1, extend = False, register = '"'):
+    def run(self, edit, repeat=1, extend=False, register='"'):
         # According to Vim's help, _ moves count - 1 lines downward.
         for i in xrange(repeat - 1):
             self.view.run_command('move', {'by': 'lines', 'forward': True, 'extend': extend})
@@ -85,7 +85,7 @@ class ViMoveToCharacter(sublime_plugin.TextCommand):
 
         return pt
 
-    def run(self, edit, character, extend = False, forward = True, before = False, record = True):
+    def run(self, edit, character, extend=False, forward=True, before=False, record=True):
         if record:
             global g_last_move_command
             g_last_move_command = {'character': character, 'extend': extend,
@@ -96,7 +96,7 @@ class ViMoveToCharacter(sublime_plugin.TextCommand):
             extend=extend)
 
 class ViExtendToEndOfWhitespaceOrWord(sublime_plugin.TextCommand):
-    def run(self, edit, repeat = 1, separators=None):
+    def run(self, edit, repeat=1, separators=None):
         repeat = int(repeat)
 
         # Selections that start on whitespace should extend to the end of the
@@ -139,7 +139,7 @@ class SetRepeatMoveToCharacterMotion(sublime_plugin.TextCommand):
         else:
             return self.run()
 
-    def run(self, reverse = False):
+    def run(self, reverse=False):
         if g_last_move_command:
             cmd = g_last_move_command.copy()
             cmd['record'] = False
@@ -196,7 +196,7 @@ def advance_while_white_space_character(view, pt, white_space="\t "):
     return pt
 
 class MoveCaretToScreenCenter(sublime_plugin.TextCommand):
-    def run(self, edit, extend = True):
+    def run(self, edit, extend=True):
         screenful = self.view.visible_region()
 
         row_a = self.view.rowcol(screenful.a)[0]
@@ -209,7 +209,7 @@ class MoveCaretToScreenCenter(sublime_plugin.TextCommand):
         transform_selection(self.view, lambda pt: middle_point, extend=extend)
 
 class MoveCaretToScreenTop(sublime_plugin.TextCommand):
-    def run(self, edit, repeat, extend = True):
+    def run(self, edit, repeat, extend=True):
         # Don't modify offset so not fully visible regions have a lower chance
         # of scrolling the screen.
         # lines_offset = int(repeat) - 1
@@ -225,7 +225,7 @@ class MoveCaretToScreenTop(sublime_plugin.TextCommand):
         transform_selection(self.view, lambda pt: target, extend=extend)
 
 class MoveCaretToScreenBottom(sublime_plugin.TextCommand):
-    def run(self, edit, repeat, extend = True):
+    def run(self, edit, repeat, extend=True):
         # Don't modify offset so not fully visible regions have a lower chance
         # of scrolling the screen.
         # lines_offset = int(repeat) - 1
@@ -254,7 +254,7 @@ def expand_to_whitespace(view, r):
     return sublime.Region(a, b)
 
 class ViExpandToWords(sublime_plugin.TextCommand):
-    def run(self, edit, outer = False, repeat = 1):
+    def run(self, edit, outer=False, repeat=1):
         repeat = int(repeat)
         transform_selection_regions(self.view, lambda r: sublime.Region(r.b + 1, r.b + 1))
         self.view.run_command("move", {"by": "stops", "extend":False, "forward":False, "word_begin":True, "punct_begin":True})
@@ -264,7 +264,7 @@ class ViExpandToWords(sublime_plugin.TextCommand):
             transform_selection_regions(self.view, lambda r: expand_to_whitespace(self.view, r))
 
 class ViExpandToBigWords(sublime_plugin.TextCommand):
-    def run(self, edit, outer = False, repeat = 1):
+    def run(self, edit, outer=False, repeat=1):
         repeat = int(repeat)
         transform_selection_regions(self.view, lambda r: sublime.Region(r.b + 1, r.b + 1))
         self.view.run_command("move", {"by": "stops", "extend":False, "forward":False, "word_begin":True, "punct_begin":True, "separators": ""})
@@ -338,19 +338,19 @@ class ViExpandToQuotes(sublime_plugin.TextCommand):
             b += 1
         return expand_to_whitespace(self.view, sublime.Region(a, b))
 
-    def run(self, edit, character, outer = False):
+    def run(self, edit, character, outer=False):
         transform_selection_regions(self.view, lambda r: self.expand_to_quote(character, r))
         if outer:
             transform_selection_regions(self.view, lambda r: self.expand_to_outer(r))
 
 class ViExpandToTag(sublime_plugin.TextCommand):
-    def run(self, edit, outer = False):
+    def run(self, edit, outer=False):
         self.view.run_command('expand_selection', {'to': 'tag'})
         if outer:
             self.view.run_command('expand_selection', {'to': 'tag'})
 
 class ViExpandToBrackets(sublime_plugin.TextCommand):
-    def run(self, edit, character, outer = False):
+    def run(self, edit, character, outer=False):
         self.view.run_command('expand_selection', {'to': 'brackets', 'brackets': character})
         if outer:
             self.view.run_command('expand_selection', {'to': 'brackets', 'brackets': character})
