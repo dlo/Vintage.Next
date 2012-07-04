@@ -6,6 +6,18 @@ MOTION_MODE_NORMAL = 0
 # Used in visual line mode: Motions are extended to BOL and EOL.
 MOTION_MODE_LINE = 2
 
+MODE_NORMAL = 0
+MODE_VISUAL = 1
+MODE_SELECT = 2
+MODE_INSERT = 3
+MODE_COMMAND_LINE = 4
+MODE_EX = 5
+MODE_OP_PENDING = 6
+MODE_REPLACE = 7
+MODE_VIRTUAL_REPLACE = 8
+MODE_INSERT_NORMAL = 9
+MODE_INSERT_VISUAL = 10
+
 # Registers are used for clipboards and macro storage
 g_registers = {}
 
@@ -14,19 +26,21 @@ g_registers = {}
 # * set_action
 # * set_motion
 # * push_repeat_digit
-class InputState(object):
-    prefix_repeat_digits = []
-    action_command = None
-    action_command_args = None
-    action_description = None
-    motion_repeat_digits = []
-    motion_command = None
-    motion_command_args = None
-    motion_mode = MOTION_MODE_NORMAL
-    motion_mode_overridden = False
-    motion_inclusive = False
-    motion_clip_to_line = False
-    register = None
+class Vintage(object):
+    def __init__(self):
+        self.prefix_repeat_digits = []
+        self.action_command = None
+        self.action_command_args = None
+        self.action_description = None
+        self.motion_repeat_digits = []
+        self.motion_command = None
+        self.motion_command_args = None
+        self.motion_mode = MOTION_MODE_NORMAL
+        self.motion_mode_overridden = False
+        self.motion_inclusive = False
+        self.motion_clip_to_line = False
+        self.register = None
+        self.mode = MODE_NORMAL
 
     def set_motion_mode(self, view, mode):
         self.motion_mode = mode
@@ -79,11 +93,11 @@ class InputState(object):
 
         view.set_status('mode', ' - '.join(desc))
 
-g_input_state = InputState()
+vintage = Vintage()
 
 class ViCancelCurrentAction(sublime_plugin.TextCommand):
     def run(self, action, action_args = {}, motion_mode = None, description = None):
-        g_input_state.reset(self.view, True)
+        vintage.reset(self.view, True)
 
 def string_to_motion_mode(mode):
     if mode == 'normal':
@@ -111,13 +125,13 @@ class InputStateTracker(sublime_plugin.EventListener):
                 if v.settings().get("vintage_start_in_command_mode"):
                     v.settings().set('command_mode', True)
                     v.settings().set('inverse_caret_state', True)
-                g_input_state.update_status_line(v)
+                vintage.update_status_line(v)
 
     def on_activated(self, view):
-        g_input_state.reset(view)
+        vintage.reset(view)
 
     def on_deactivated(self, view):
-        g_input_state.reset(view)
+        vintage.reset(view)
 
         # Ensure that insert mode actions will no longer be grouped, otherwise
         # it can lead to the impression that too much is undone at once
@@ -129,13 +143,13 @@ class InputStateTracker(sublime_plugin.EventListener):
         view.run_command('unmark_undo_groups_for_gluing')
 
     def on_selection_modified(self, view):
-        g_input_state.reset(view, False)
+        vintage.reset(view, False)
         # Get out of visual line mode if the selection has changed, e.g., due
         # to clicking with the mouse
-        if (g_input_state.motion_mode == MOTION_MODE_LINE and
+        if (vintage.motion_mode == MOTION_MODE_LINE and
             not view.has_non_empty_selection_region()):
-            g_input_state.motion_mode = MOTION_MODE_NORMAL
-        g_input_state.update_status_line(view)
+            vintage.motion_mode = MOTION_MODE_NORMAL
+        vintage.update_status_line(view)
 
     def on_load(self, view):
         if view.settings().get("vintage_start_in_command_mode"):
@@ -148,74 +162,74 @@ class InputStateTracker(sublime_plugin.EventListener):
         self.on_load(view)
 
     def on_query_context(self, view, key, operator, operand, match_all):
-        if key == "vi_action" and g_input_state.action_command:
+        if key == "vi_action" and vintage.action_command:
             if operator == sublime.OP_EQUAL:
-                return operand == g_input_state.action_command
+                return operand == vintage.action_command
             if operator == sublime.OP_NOT_EQUAL:
-                return operand != g_input_state.action_command
+                return operand != vintage.action_command
         elif key == "vi_has_action":
-            v = g_input_state.action_command is not None
+            v = vintage.action_command is not None
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
         elif key == "vi_has_register":
-            r = g_input_state.register is not None
+            r = vintage.register is not None
             if operator == sublime.OP_EQUAL: return r == operand
             if operator == sublime.OP_NOT_EQUAL: return r != operand
         elif key == "vi_motion_mode":
             m = string_to_motion_mode(operand)
             if operator == sublime.OP_EQUAL:
-                return m == g_input_state.motion_mode
+                return m == vintage.motion_mode
             if operator == sublime.OP_NOT_EQUAL:
-                return m != g_input_state.motion_mode
+                return m != vintage.motion_mode
         elif key == "vi_has_repeat_digit":
-            if g_input_state.action_command:
-                v = len(g_input_state.motion_repeat_digits) > 0
+            if vintage.action_command:
+                v = len(vintage.motion_repeat_digits) > 0
             else:
-                v = len(g_input_state.prefix_repeat_digits) > 0
+                v = len(vintage.prefix_repeat_digits) > 0
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
         elif key == "vi_has_input_state":
-            v = (len(g_input_state.motion_repeat_digits) > 0 or
-                len(g_input_state.prefix_repeat_digits) > 0 or
-                g_input_state.action_command is not None or
-                g_input_state.register is not None)
+            v = (len(vintage.motion_repeat_digits) > 0 or
+                len(vintage.prefix_repeat_digits) > 0 or
+                vintage.action_command is not None or
+                vintage.register is not None)
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
         elif key == "vi_can_enter_text_object":
-            v = (g_input_state.action_command is not None) or view.has_non_empty_selection_region()
+            v = (vintage.action_command is not None) or view.has_non_empty_selection_region()
             if operator == sublime.OP_EQUAL: return v == operand
             if operator == sublime.OP_NOT_EQUAL: return v != operand
 
         return None
 
-# Called when g_input_state represents a fully formed command. Generates a
+# Called when vintage represents a fully formed command. Generates a
 # call to vi_eval, which is what will be left on the undo/redo stack.
 def eval_input(view):
-    global g_input_state
+    global vintage
 
     cmd_args = {
-        'action_command': g_input_state.action_command,
-        'action_args': g_input_state.action_command_args,
-        'motion_command': g_input_state.motion_command,
-        'motion_args': g_input_state.motion_command_args,
-        'motion_mode': g_input_state.motion_mode,
-        'motion_inclusive': g_input_state.motion_inclusive,
-        'motion_clip_to_line': g_input_state.motion_clip_to_line }
+        'action_command': vintage.action_command,
+        'action_args': vintage.action_command_args,
+        'motion_command': vintage.motion_command,
+        'motion_args': vintage.motion_command_args,
+        'motion_mode': vintage.motion_mode,
+        'motion_inclusive': vintage.motion_inclusive,
+        'motion_clip_to_line': vintage.motion_clip_to_line }
 
-    if len(g_input_state.prefix_repeat_digits) > 0:
-        cmd_args['prefix_repeat'] = digits_to_number(g_input_state.prefix_repeat_digits)
+    if len(vintage.prefix_repeat_digits) > 0:
+        cmd_args['prefix_repeat'] = digits_to_number(vintage.prefix_repeat_digits)
 
-    if len(g_input_state.motion_repeat_digits) > 0:
-        cmd_args['motion_repeat'] = digits_to_number(g_input_state.motion_repeat_digits)
+    if len(vintage.motion_repeat_digits) > 0:
+        cmd_args['motion_repeat'] = digits_to_number(vintage.motion_repeat_digits)
 
-    if g_input_state.register is not None:
+    if vintage.register is not None:
         if not cmd_args['action_args']:
             cmd_args['action_args'] = {}
-        cmd_args['action_args']['register'] = g_input_state.register
+        cmd_args['action_args']['register'] = vintage.register
 
-    reset_motion_mode = (g_input_state.action_command is not None)
+    reset_motion_mode = (vintage.action_command is not None)
 
-    g_input_state.reset(view, reset_motion_mode)
+    vintage.reset(view, reset_motion_mode)
 
     view.run_command('vi_eval', cmd_args)
 
@@ -228,12 +242,12 @@ def eval_input(view):
 # These commands will all delete 4 words.
 class PushRepeatDigit(sublime_plugin.TextCommand):
     def run(self, edit, digit):
-        global g_input_state
-        if g_input_state.action_command:
-            g_input_state.motion_repeat_digits.append(digit)
+        global vintage
+        if vintage.action_command:
+            vintage.motion_repeat_digits.append(digit)
         else:
-            g_input_state.prefix_repeat_digits.append(digit)
-        g_input_state.update_status_line(self.view)
+            vintage.prefix_repeat_digits.append(digit)
+        vintage.update_status_line(self.view)
 
 # Set the current action in the input state. Note that this won't create an
 # entry on the undo stack: only eval_input does this.
@@ -247,17 +261,17 @@ class SetAction(sublime_plugin.TextCommand):
         return self.run(**args)
 
     def run(self, action, action_args = {}, description = None):
-        global g_input_state
-        g_input_state.action_command = action
-        g_input_state.action_command_args = action_args
-        g_input_state.action_description = description
+        global vintage
+        vintage.action_command = action
+        vintage.action_command_args = action_args
+        vintage.action_description = description
 
         if self.view.has_non_empty_selection_region():
             # Currently in visual mode, so no following motion is expected:
             # eval the current input
             eval_input(self.view)
         else:
-            g_input_state.update_status_line(self.view)
+            vintage.update_status_line(self.view)
 
 def digits_to_number(digits):
     if len(digits) == 0:
@@ -281,26 +295,26 @@ class SetMotion(sublime_plugin.TextCommand):
     def run(self, motion, motion_args = {}, linewise = False, inclusive = False,
             clip_to_line = False, character = None, mode = None):
 
-        global g_input_state
+        global vintage
 
         # Pass the character, if any, onto the motion command.
         # This is required for 'f', 't', etc
         if character is not None:
             motion_args['character'] = character
 
-        g_input_state.motion_command = motion
-        g_input_state.motion_command_args = motion_args
-        g_input_state.motion_inclusive = inclusive
-        g_input_state.motion_clip_to_line = clip_to_line
-        if not g_input_state.motion_mode_overridden \
-                and g_input_state.action_command \
+        vintage.motion_command = motion
+        vintage.motion_command_args = motion_args
+        vintage.motion_inclusive = inclusive
+        vintage.motion_clip_to_line = clip_to_line
+        if not vintage.motion_mode_overridden \
+                and vintage.action_command \
                 and linewise:
-            g_input_state.motion_mode = MOTION_MODE_LINE
+            vintage.motion_mode = MOTION_MODE_LINE
 
         if mode is not None:
             m = string_to_motion_mode(mode)
             if m != -1:
-                g_input_state.set_motion_mode(self.view, m)
+                vintage.set_motion_mode(self.view, m)
             else:
                 print "invalid motion mode:", mode
 
@@ -317,16 +331,16 @@ class SetActionMotion(sublime_plugin.TextCommand):
     def run(self, motion, action, motion_args = {}, motion_clip_to_line = False,
             motion_inclusive = False, motion_linewise = False, action_args = {}):
 
-        global g_input_state
+        global vintage
 
-        g_input_state.motion_command = motion
-        g_input_state.motion_command_args = motion_args
-        g_input_state.motion_inclusive = motion_inclusive
-        g_input_state.motion_clip_to_line = motion_clip_to_line
-        g_input_state.action_command = action
-        g_input_state.action_command_args = action_args
+        vintage.motion_command = motion
+        vintage.motion_command_args = motion_args
+        vintage.motion_inclusive = motion_inclusive
+        vintage.motion_clip_to_line = motion_clip_to_line
+        vintage.action_command = action
+        vintage.action_command_args = action_args
         if motion_linewise:
-            g_input_state.motion_mode = MOTION_MODE_LINE
+            vintage.motion_mode = MOTION_MODE_LINE
 
         eval_input(self.view)
 
@@ -339,12 +353,12 @@ class SetMotionMode(sublime_plugin.TextCommand):
         return self.run(**args)
 
     def run(self, mode):
-        global g_input_state
+        global vintage
         m = string_to_motion_mode(mode)
 
         if m != -1:
-            g_input_state.set_motion_mode(self.view, m)
-            g_input_state.motion_mode_overridden = True
+            vintage.set_motion_mode(self.view, m)
+            vintage.motion_mode_overridden = True
         else:
             print "invalid motion mode"
 
@@ -353,8 +367,8 @@ class SetRegister(sublime_plugin.TextCommand):
         return self.run(**args)
 
     def run(self, character):
-        g_input_state.register = character
-        g_input_state.update_status_line(self.view)
+        vintage.register = character
+        vintage.update_status_line(self.view)
 
 def clip_point_to_line(view, f, pt):
     l = view.line(pt)
@@ -492,7 +506,7 @@ def shrink_to_first_char(r):
 # This is the core: it takes a motion command, action command, and repeat
 # counts, and runs them all.
 #
-# Note that this doesn't touch g_input_state, and doesn't maintain any state
+# Note that this doesn't touch vintage, and doesn't maintain any state
 # other than what's passed on its arguments. This allows it to operate correctly
 # in macros, and when running via repeat.
 class ViEval(sublime_plugin.TextCommand):
@@ -502,6 +516,9 @@ class ViEval(sublime_plugin.TextCommand):
         edit = self.view.begin_edit(self.name(), args)
         try:
             self.run(edit, **args)
+        except:
+            # TODO: Need to specify exception
+            pass
         finally:
             self.view.end_edit(edit)
 
@@ -656,17 +673,20 @@ class EnterInsertMode(sublime_plugin.TextCommand):
             args.update({'register': register})
             self.view.run_command(insert_command, args)
 
-        g_input_state.mode = MODE_INSERT
+        vintage.mode = MODE_INSERT
 
         self.view.settings().set('command_mode', False)
         self.view.settings().set('inverse_caret_state', False)
-        g_input_state.update_status_line(self.view)
+        vintage.update_status_line(self.view)
 
 class ExitInsertMode(sublime_plugin.TextCommand):
     def run_(self, args):
         edit = self.view.begin_edit(self.name(), args)
         try:
             self.run(edit)
+        except:
+            # TODO: What are we catching here?
+            pass
         finally:
             self.view.end_edit(edit)
 
@@ -675,7 +695,7 @@ class ExitInsertMode(sublime_plugin.TextCommand):
         self.view.run_command('glue_marked_undo_groups')
 
     def run(self, edit):
-        g_input_state.mode = MODE_NORMAL
+        vintage.mode = MODE_NORMAL
 
         self.view.settings().set('command_mode', True)
         self.view.settings().set('inverse_caret_state', True)
@@ -683,35 +703,35 @@ class ExitInsertMode(sublime_plugin.TextCommand):
         if not self.view.has_non_empty_selection_region():
             self.view.run_command('vi_move_by_characters_in_line', {'forward': False})
 
-        g_input_state.update_status_line(self.view)
+        vintage.update_status_line(self.view)
 
 class EnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command('mark_undo_groups_for_gluing')
 
-        g_input_state.mode = MODE_VISUAL
+        vintage.mode = MODE_VISUAL
 
-        if g_input_state.motion_mode != MOTION_MODE_NORMAL:
-            g_input_state.set_motion_mode(self.view, MOTION_MODE_NORMAL)
+        if vintage.motion_mode != MOTION_MODE_NORMAL:
+            vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
 
         transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
 class ExitVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, toggle = False):
         if toggle:
-            if g_input_state.motion_mode != MOTION_MODE_NORMAL:
-                g_input_state.set_motion_mode(self.view, MOTION_MODE_NORMAL)
+            if vintage.motion_mode != MOTION_MODE_NORMAL:
+                vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
             else:
                 self.view.run_command('shrink_selections')
         else:
-            g_input_state.set_motion_mode(self.view, MOTION_MODE_NORMAL)
+            vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
             self.view.run_command('shrink_selections')
 
         self.view.run_command('unmark_undo_groups_for_gluing')
 
 class EnterVisualLineMode(sublime_plugin.TextCommand):
     def run(self, edit):
-        g_input_state.set_motion_mode(self.view, MOTION_MODE_LINE)
+        vintage.set_motion_mode(self.view, MOTION_MODE_LINE)
         expand_to_full_line(self.view)
         self.view.run_command('maybe_mark_undo_groups_for_gluing')
 
@@ -792,19 +812,19 @@ class ViCopy(sublime_plugin.TextCommand):
         transform_selection_regions(self.view, shrink_to_first_char)
 
 class ViPrefixableCommand(sublime_plugin.TextCommand):
-    # Ensure register and repeat are picked up from g_input_state, and that
+    # Ensure register and repeat are picked up from vintage, and that
     # it'll be recorded on the undo stack
     def run_(self, args):
         if not args:
             args = {}
 
-        if g_input_state.register:
-            args['register'] = g_input_state.register
-            g_input_state.register = None
+        if vintage.register:
+            args['register'] = vintage.register
+            vintage.register = None
 
-        if g_input_state.prefix_repeat_digits:
-            args['repeat'] = digits_to_number(g_input_state.prefix_repeat_digits)
-            g_input_state.prefix_repeat_digits = []
+        if vintage.prefix_repeat_digits:
+            args['repeat'] = digits_to_number(vintage.prefix_repeat_digits)
+            vintage.prefix_repeat_digits = []
 
         if 'event' in args:
             del args['event']
@@ -1061,14 +1081,14 @@ class ViReplayMacro(sublime_plugin.TextCommand):
         if not character in g_registers:
             return
         m = g_registers[character]
-        global g_input_state
+        global vintage
 
         prefix_repeat_digits, motion_repeat_digits = None, None
-        if len(g_input_state.prefix_repeat_digits) > 0:
-            prefix_repeat_digits = digits_to_number(g_input_state.prefix_repeat_digits)
+        if len(vintage.prefix_repeat_digits) > 0:
+            prefix_repeat_digits = digits_to_number(vintage.prefix_repeat_digits)
 
-        if len(g_input_state.motion_repeat_digits) > 0:
-            motion_repeat_digits = digits_to_number(g_input_state.motion_repeat_digits)
+        if len(vintage.motion_repeat_digits) > 0:
+            motion_repeat_digits = digits_to_number(vintage.motion_repeat_digits)
 
         repetitions = 1
         if prefix_repeat_digits:
