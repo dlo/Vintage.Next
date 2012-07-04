@@ -21,6 +21,10 @@ MODE_INSERT_VISUAL = 10
 # Registers are used for clipboards and macro storage
 g_registers = {}
 
+class VintageStatus(object):
+    def __init__(self):
+        self.mode = MODE_NORMAL
+
 # Represents the current input state. The primary commands that interact with
 # this are:
 # * set_action
@@ -40,13 +44,15 @@ class Vintage(object):
         self.motion_inclusive = False
         self.motion_clip_to_line = False
         self.register = None
+        self.modes = {}
         self.mode = MODE_NORMAL
 
     def set_motion_mode(self, view, mode):
+        self.modes[view] = mode
         self.motion_mode = mode
         self.update_status_line(view)
 
-    def reset(self, view, reset_motion_mode = True):
+    def reset(self, view, reset_motion_mode=True):
         self.prefix_repeat_digits = []
         self.action_command = None
         self.action_command_args = None
@@ -58,12 +64,46 @@ class Vintage(object):
         self.motion_inclusive = False
         self.motion_clip_to_line = False
         self.register = None
+        self.modes = {}
         if reset_motion_mode:
             self.set_motion_mode(view, MOTION_MODE_NORMAL)
 
     # Updates the status bar to reflect the current mode and input state
     def update_status_line(self, view):
         desc = []
+        try:
+            vintage_status = self.modes.setdefault(view, VintageStatus())
+        except KeyError:
+            pass
+        else:
+            if vintage_status.mode == MODE_NORMAL:
+                desc = ["NORMAL MODE"]
+                if self.action_command is not None:
+                    if self.action_description:
+                        desc.append(self.action_description)
+                    else:
+                        desc.append(self.action_command)
+            elif vintage_status.mode == MODE_VISUAL:
+                desc = ["VISUAL MODE"]
+            elif vintage_status.mode == MODE_INSERT:
+                desc = ["INSERT MODE"]
+            elif vintage_status.mode == MODE_REPLACE:
+                pass
+            elif vintage_status.mode == MODE_EX:
+                pass
+            elif vintage_status.mode == MODE_SELECT:
+                pass
+            elif vintage_status.mode == MODE_INSERT_VISUAL:
+                pass
+            elif vintage_status.mode == MODE_INSERT_NORMAL:
+                pass
+            elif vintage_status.mode == MODE_COMMAND_LINE:
+                pass
+            elif vintage_status.mode == MODE_OP_PENDING:
+                pass
+
+        finally:
+            pass
 
         if view.settings().get('command_mode'):
             if self.motion_mode == MOTION_MODE_LINE:
