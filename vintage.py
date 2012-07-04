@@ -25,6 +25,14 @@ class VintageStatus(object):
     def __init__(self):
         self.mode = MODE_NORMAL
 
+        # Any verb, e.g., dyxprcuJ
+        self.verb = None
+
+        self.noun = None
+
+        # A motion key, such as 0-9 or hjkltfaibwH
+        self.adjective = None
+
 # Represents the current input state. The primary commands that interact with
 # this are:
 # * set_action
@@ -68,8 +76,7 @@ class Vintage(object):
         if reset_motion_mode:
             self.set_motion_mode(view, MOTION_MODE_NORMAL)
 
-    # Updates the status bar to reflect the current mode and input state
-    def update_status_line(self, view):
+    def update_status_line2(self, view):
         desc = []
         try:
             vintage_status = self.modes.setdefault(view, VintageStatus())
@@ -105,6 +112,8 @@ class Vintage(object):
         finally:
             pass
 
+    # Updates the status bar to reflect the current mode and input state
+    def update_status_line(self, view):
         if view.settings().get('command_mode'):
             if self.motion_mode == MOTION_MODE_LINE:
                 desc = ['VISUAL LINE MODE']
@@ -136,7 +145,7 @@ class Vintage(object):
 vintage = Vintage()
 
 class ViCancelCurrentAction(sublime_plugin.TextCommand):
-    def run(self, action, action_args = {}, motion_mode = None, description = None):
+    def run(self, action, action_args={}, motion_mode=None, description=None):
         vintage.reset(self.view, True)
 
 def string_to_motion_mode(mode):
@@ -300,7 +309,7 @@ class SetAction(sublime_plugin.TextCommand):
 
         return self.run(**args)
 
-    def run(self, action, action_args = {}, description = None):
+    def run(self, action, action_args={}, description=None):
         global vintage
         vintage.action_command = action
         vintage.action_command_args = action_args
@@ -332,8 +341,8 @@ class SetMotion(sublime_plugin.TextCommand):
     def run_(self, args):
         return self.run(**args)
 
-    def run(self, motion, motion_args = {}, linewise = False, inclusive = False,
-            clip_to_line = False, character = None, mode = None):
+    def run(self, motion, motion_args={}, linewise=False, inclusive=False,
+            clip_to_line=False, character=None, mode=None):
 
         global vintage
 
@@ -368,8 +377,8 @@ class SetActionMotion(sublime_plugin.TextCommand):
     def run_(self, args):
         return self.run(**args)
 
-    def run(self, motion, action, motion_args = {}, motion_clip_to_line = False,
-            motion_inclusive = False, motion_linewise = False, action_args = {}):
+    def run(self, motion, action, motion_args={}, motion_clip_to_line=False,
+            motion_inclusive=False, motion_linewise=False, action_args={}):
 
         global vintage
 
@@ -423,7 +432,7 @@ def clip_point_to_line(view, f, pt):
     else:
         return new_pt
 
-def transform_selection(view, f, extend = False, clip_to_line = False):
+def transform_selection(view, f, extend=False, clip_to_line=False):
     new_sel = []
     sel = view.sel()
     size = view.size()
@@ -459,7 +468,7 @@ def transform_selection_regions(view, f):
     for r in new_sel:
         sel.add(r)
 
-def expand_to_full_line(view, ignore_trailing_newline = True):
+def expand_to_full_line(view, ignore_trailing_newline=True):
     new_sel = []
     for s in view.sel():
         if s.a == s.b:
@@ -575,7 +584,7 @@ class ViEval(sublime_plugin.TextCommand):
     def run(self, edit, action_command, action_args,
             motion_command, motion_args, motion_mode,
             motion_inclusive, motion_clip_to_line,
-            prefix_repeat = None, motion_repeat = None):
+            prefix_repeat=None, motion_repeat=None):
 
         explicit_repeat = (prefix_repeat is not None or motion_repeat is not None)
 
@@ -703,7 +712,7 @@ class EnterInsertMode(sublime_plugin.TextCommand):
         else:
             return self.run()
 
-    def run(self, insert_command = None, insert_args = {}, register = '"'):
+    def run(self, insert_command=None, insert_args={}, register='"'):
         # mark_undo_groups_for_gluing allows all commands run while in insert
         # mode to comprise a single undo group, which is important for '.' to
         # work as desired.
@@ -757,7 +766,7 @@ class EnterVisualMode(sublime_plugin.TextCommand):
         transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
 class ExitVisualMode(sublime_plugin.TextCommand):
-    def run(self, edit, toggle = False):
+    def run(self, edit, toggle=False):
         if toggle:
             if vintage.motion_mode != MOTION_MODE_NORMAL:
                 vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
@@ -791,7 +800,7 @@ class ShrinkSelectionsToBeginning(sublime_plugin.TextCommand):
     def shrink(self, r):
         return sublime.Region(r.begin())
 
-    def run(self, edit, register = '"'):
+    def run(self, edit, register='"'):
         transform_selection_regions(self.view, self.shrink)
 
 class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
@@ -803,7 +812,7 @@ class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
         else:
             return sublime.Region(end)
 
-    def run(self, edit, register = '"'):
+    def run(self, edit, register='"'):
         transform_selection_regions(self.view, self.shrink)
 
 class VisualUpperCase(sublime_plugin.TextCommand):
@@ -825,28 +834,28 @@ class Sequence(sublime_plugin.TextCommand):
             self.view.run_command(cmd, args)
 
 class ViDelete(sublime_plugin.TextCommand):
-    def run(self, edit, register = '"'):
+    def run(self, edit, register='"'):
         if self.view.has_non_empty_selection_region():
             set_register(self.view, register, forward=False)
             set_register(self.view, '1', forward=False)
             self.view.run_command('left_delete')
 
 class ViLeftDelete(sublime_plugin.TextCommand):
-    def run(self, edit, register = '"'):
+    def run(self, edit, register='"'):
         set_register(self.view, register, forward=False)
         set_register(self.view, '1', forward=False)
         self.view.run_command('left_delete')
         clip_empty_selection_to_line_contents(self.view)
 
 class ViRightDelete(sublime_plugin.TextCommand):
-    def run(self, edit, register = '"'):
+    def run(self, edit, register='"'):
         set_register(self.view, register, forward=True)
         set_register(self.view, '1', forward=True)
         self.view.run_command('right_delete')
         clip_empty_selection_to_line_contents(self.view)
 
 class ViCopy(sublime_plugin.TextCommand):
-    def run(self, edit, register = '"'):
+    def run(self, edit, register='"'):
         set_register(self.view, register, forward=True)
         set_register(self.view, '0', forward=True)
         transform_selection_regions(self.view, shrink_to_first_char)
@@ -882,7 +891,7 @@ class ViPasteRight(ViPrefixableCommand):
         else:
             return pt + 1
 
-    def run(self, edit, register = '"', repeat = 1):
+    def run(self, edit, register='"', repeat=1):
         visual_mode = self.view.has_non_empty_selection_region()
         if not visual_mode:
             transform_selection(self.view, lambda pt: self.advance(pt))
@@ -891,7 +900,7 @@ class ViPasteRight(ViPrefixableCommand):
                                                       'register': register})
 
 class ViPasteLeft(ViPrefixableCommand):
-    def run(self, edit, register = '"', repeat = 1):
+    def run(self, edit, register='"', repeat=1):
         self.view.run_command('paste_from_register', {'forward': False,
                                                       'repeat': repeat,
                                                       'register': register})
@@ -950,7 +959,7 @@ def has_register(register):
         return register in g_registers
 
 class PasteFromRegisterCommand(sublime_plugin.TextCommand):
-    def run(self, edit, register, repeat = 1, forward = True):
+    def run(self, edit, register, repeat=1, forward=True):
         text = get_register(self.view, register)
         if not text:
             sublime.status_message("Undefined register" + register)
@@ -990,7 +999,7 @@ class PasteFromRegisterCommand(sublime_plugin.TextCommand):
         for s in new_sel:
             self.view.sel().add(s)
 
-    def is_enabled(self, register, repeat = 1, forward = True):
+    def is_enabled(self, register, repeat=1, forward=True):
         return has_register(register)
 
 class ReplaceCharacter(sublime_plugin.TextCommand):
@@ -1041,7 +1050,7 @@ class ScrollCursorLineToBottom(sublime_plugin.TextCommand):
         self.view.show(self.view.sel()[0], False)
 
 class ViScrollLines(ViPrefixableCommand):
-    def run(self, edit, forward = True, repeat = None):
+    def run(self, edit, forward=True, repeat=None):
         if repeat:
             line_delta = repeat * (1 if forward else -1)
         else:
@@ -1058,7 +1067,7 @@ class ViScrollLines(ViPrefixableCommand):
                             - self.view.text_to_layout(pt)[1])
             return new_pt
 
-        transform_selection(self.view, transform, extend = visual_mode)
+        transform_selection(self.view, transform, extend=visual_mode)
 
         self.view.run_command('vi_move_to_first_non_white_space_character',
                               {'extend': visual_mode})
@@ -1123,7 +1132,7 @@ class ViReplayMacro(sublime_plugin.TextCommand):
         m = g_registers[character]
         global vintage
 
-        prefix_repeat_digits, motion_repeat_digits = None, None
+        prefix_repeat_digits, motion_repeat_digits=None, None
         if len(vintage.prefix_repeat_digits) > 0:
             prefix_repeat_digits = digits_to_number(vintage.prefix_repeat_digits)
 
