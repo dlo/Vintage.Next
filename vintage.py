@@ -54,6 +54,8 @@ class VintageState(object):
 
         self._count = self.settings['count']
         self._action = self.settings['action']
+
+        # This is the mode the editor drops into after performing the action.
         self._followup_mode = self.settings['followup_mode']
         self.noun = None
 
