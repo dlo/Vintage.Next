@@ -208,42 +208,7 @@ class Vintage(object):
         if reset_motion_mode:
             self.set_motion_mode(view, MOTION_MODE_NORMAL)
 
-    # Updates the status bar to reflect the current mode and input state
-    def update_status_line(self, view):
-        return
-        if view.settings().get('command_mode'):
-            if self.motion_mode == MOTION_MODE_LINE:
-                desc = ['VISUAL LINE MODE']
-            elif view.has_non_empty_selection_region():
-                desc = ['VISUAL MODE']
-            else:
-                desc = ['NORMAL MODE']
-                if self.action_command is not None:
-                    if self.action_description:
-                        desc.append(self.action_description)
-                    else:
-                        desc.append(self.action_command)
-
-                repeat = (digits_to_number(self.prefix_repeat_digits)
-                    * digits_to_number(self.motion_repeat_digits))
-                if repeat != 1:
-                    if self.action_command is not None:
-                        desc[-1] += " * " + str(repeat)
-                    else:
-                        desc.append("* " + str(repeat))
-
-            if self.register is not None:
-                desc.insert(1, 'Register "' + self.register + '"')
-        else:
-            desc = ['INSERT MODE']
-
-        view.set_status('mode', ' - '.join(desc))
-
 vintage = Vintage()
-
-class ViCancelCurrentAction(sublime_plugin.TextCommand):
-    def run(self, action, action_args={}, motion_mode=None, description=None):
-        vintage.reset(self.view, True)
 
 def string_to_motion_mode(mode):
     if mode == 'normal':
