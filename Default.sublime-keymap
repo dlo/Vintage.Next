@@ -27,35 +27,12 @@
       { "key": "vi_mode_motion" }
     ]
   },
-  { "keys": ["h"], "command": "vi_move",
-    "context": [
-      { "key": "vi_mode_motion" }
-    ],
-    "args": {"forward": false, "by": "characters"}
-  },
-  { "keys": ["j"], "command": "vi_move",
-    "context": [
-      { "key": "vi_mode_motion" }
-    ],
-    "args": {"forward": true, "by": "lines"}
-  },
-  { "keys": ["k"], "command": "vi_move",
-    "context": [
-      { "key": "vi_mode_motion" }
-    ],
-    "args": {"forward": false, "by": "lines"}
-  },
-  { "keys": ["l"], "command": "vi_move",
-    "context": [
-      { "key": "vi_mode_motion" }
-    ],
-    "args": {"forward": true, "by": "characters"}
-  },
+  { "keys": ["j"], "command": "vi_move", "context": [ { "key": "vi_mode_motion" } ], "args": {"forward": true, "by": "lines"}},
+  { "keys": ["k"], "command": "vi_move", "context": [ { "key": "vi_mode_motion" } ], "args": {"forward": false, "by": "lines"}},
+  { "keys": ["h"], "command": "vi_move", "context": [ { "key": "vi_mode_motion" } ], "args": {"forward": false, "by": "characters"}},
+  { "keys": ["l"], "command": "vi_move", "context": [ { "key": "vi_mode_motion" } ], "args": {"forward": true, "by": "characters"}},
 
-  { "keys": ["G"], "command": "vi_goto_line",
-    "context": [{"key": "vi_mode_motion"}]
-  },
-
+  { "keys": ["G"], "command": "vi_goto_line", "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["w"], "command": "vi_move", "args": {"forward": true, "by": "words"}, "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["W"], "command": "vi_move", "args": {"forward": true, "by": "WORDS"}, "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["b"], "command": "vi_move", "args": {"forward": false, "by": "words"}, "context": [{"key": "vi_mode_motion"}]},
@@ -102,9 +79,10 @@
   { "keys": ["u"], "command": "vi_lower_case", "context": [ {"key": "vi_mode_visual"}]},
   { "keys": ["U"], "command": "vi_upper_case", "context": [ {"key": "vi_mode_visual"}]},
 
-  { "keys": ["d"], "command": "vi_delete", "args": {"name": "delete"}, "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["y"], "command": "vi_copy", "args": {"name": "copy"}, "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["c"], "command": "vi_change", "args": {"name": "change"}, "context": [{"key": "vi_mode_motion"}]}
+  { "keys": ["d"], "command": "vi_delete", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["y"], "command": "vi_copy", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["c"], "command": "vi_change", "args": {"mode": "insert"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["s"], "command": "vi_change", "args": {"mode": "insert"}, "context": [{"key": "vi_mode_motion"}]}
 
   /*
 
