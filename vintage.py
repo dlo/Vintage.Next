@@ -19,9 +19,12 @@ MODE_INSERT_NORMAL = 1 << 9
 MODE_INSERT_VISUAL = 1 << 10
 MODE_VISUAL_LINE = 1 << 11
 
-ACTION_DELETE_CHAR = 0
-ACTION_DELETE_LINE = 1
-ACTION_DELETE_EOL = 2
+ACTION_DELETE_CHARACTER = 0
+ACTION_DELETE_SELECTION = 1
+ACTION_DELETE_LINE = 2
+ACTION_COPY_CHARACTER = 3
+ACTION_COPY_SELECTION = 4
+ACTION_COPY_LINE = 5
 
 MODE_MAPPING = {
     'vi_mode_normal': MODE_NORMAL,
@@ -57,10 +60,6 @@ class VintageState(object):
 
         # This is the mode the editor drops into after performing the action.
         self._followup_mode = self.settings['followup_mode']
-        self.noun = None
-
-        # A motion key, such as 0-9 or hjkltfaibwH
-        self.adjective = None
 
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
@@ -274,17 +273,18 @@ class ViEnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_VISUAL
+        transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
 
 class ViEnterSelectMode(sublime_plugin.TextCommand):
     """ Not implemented """
     pass
 
-
 class ViEnterNormalMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_NORMAL
+        transform_selection_regions(self.view, shrink_selection_regions)
 
 
 class ViEnterReplaceMode(sublime_plugin.TextCommand):
@@ -296,6 +296,7 @@ class ViEnterVisualLineMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_VISUAL_LINE
+        expand_to_full_line(self.view)
 
 
 class ViEnterVirtualReplaceMode(sublime_plugin.TextCommand):
@@ -518,6 +519,10 @@ class ViMove(sublime_plugin.TextCommand):
             args['separators'] = ""
 
         vintage_state = VintageState(self.view)
+
+        if vintage_state.mode_matches_context("vi_mode_visual"):
+            args['extend'] = True
+
         for i in range(min(100000, vintage_state.count)):
             old_row, _ = self.view.rowcol(self.view.sel()[0].begin())
             self.view.run_command("move", args)
@@ -532,10 +537,17 @@ class ViMove(sublime_plugin.TextCommand):
 class ViGotoLine(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
         vintage_state = VintageState(self.view)
+
+        args = {}
         if not vintage_state._count:
-            self.view.run_command("move_to", {'to': "eof"})
+            if vintage_state.mode_matches_context("vi_mode_visual"):
+                args['extend'] = True
+
+            args['to'] = "eof"
+            self.view.run_command("move_to", args)
         else:
-            self.view.run_command("goto_line", {'line': vintage_state.count})
+            args['line'] = vintage_state.count
+            self.view.run_command("goto_line", args)
             del vintage_state.count
 
 
@@ -548,7 +560,11 @@ class ViPushDigit(sublime_plugin.TextCommand):
 class ViSetAction(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
         vintage_state = VintageState(self.view)
-        vintage_state.action = kwargs['name']
+
+
+class ViDelete(sublime_plugin.TextCommand):
+    def run(self, edit, **kwargs):
+        vintage_state = VintageState(self.view)
 
 
 # Set the current motion in the input state. Note that this won't create an
@@ -673,44 +689,44 @@ def transform_selection(view, f, extend=False, clip_to_line=False):
     for r in new_sel:
         sel.add(r)
 
-def transform_selection_regions(view, f):
-    new_sel = []
-    sel = view.sel()
+def transform_selection_regions(view, transformer):
+    new_region_set = []
+    region_set = view.sel()
 
-    for r in sel:
-        nr = f(r)
-        if nr is not None:
-            new_sel.append(nr)
+    for region in region_set:
+        new_region = transformer(region)
+        if new_region is not None:
+            new_region_set.append(new_region)
 
-    sel.clear()
-    for r in new_sel:
-        sel.add(r)
+    region_set.clear()
+    for region in new_region_set:
+        region_set.add(region)
 
 def expand_to_full_line(view, ignore_trailing_newline=True):
     new_sel = []
-    for s in view.sel():
-        if s.a == s.b:
-            new_sel.append(view.full_line(s.a))
+    for selection in view.sel():
+        if selection.a == selection.b:
+            new_sel.append(view.full_line(selection.a))
         else:
-            la = view.full_line(s.begin())
-            lb = view.full_line(s.end())
+            la = view.full_line(selection.begin())
+            lb = view.full_line(selection.end())
 
             a = la.a
 
-            if ignore_trailing_newline and s.end() == lb.a:
-                # s.end() is already at EOL, don't go down to the next line
-                b = s.end()
+            if ignore_trailing_newline and selection.end() == lb.a:
+                # selection.end() is already at EOL, don't go down to the next line
+                b = selection.end()
             else:
                 b = lb.b
 
-            if s.a < s.b:
+            if selection.a < selection.b:
                 new_sel.append(sublime.Region(a, b, 0))
             else:
                 new_sel.append(sublime.Region(b, a, 0))
 
     view.sel().clear()
-    for s in new_sel:
-        view.sel().add(s)
+    for selection in new_sel:
+        view.sel().add(selection)
 
 def orient_single_line_region(view, forward, r):
     l = view.full_line(r.begin())
@@ -1002,17 +1018,13 @@ class EnterVisualLineMode(sublime_plugin.TextCommand):
         expand_to_full_line(self.view)
         self.view.run_command('maybe_mark_undo_groups_for_gluing')
 
-class ShrinkSelections(sublime_plugin.TextCommand):
-    def shrink(self, r):
-        if r.empty():
-            return r
-        elif r.a < r.b:
-            return sublime.Region(r.b - 1)
-        else:
-            return sublime.Region(r.b)
-
-    def run(self, edit):
-        transform_selection_regions(self.view, self.shrink)
+def shrink_selection_regions(r):
+    if r.empty():
+        return r
+    elif r.a < r.b:
+        return sublime.Region(r.b - 1)
+    else:
+        return sublime.Region(r.b)
 
 class ShrinkSelectionsToBeginning(sublime_plugin.TextCommand):
     def shrink(self, r):
@@ -1033,11 +1045,13 @@ class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
         transform_selection_regions(self.view, self.shrink)
 
+
 class ViUpperCase(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command("upper_case")
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_NORMAL
+
 
 class ViLowerCase(sublime_plugin.TextCommand):
     def run(self, edit):
