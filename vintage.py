@@ -35,6 +35,8 @@ MODE_MAPPING = {
 g_registers = {}
 
 class SublimeSettings(object):
+    """ Helper class for accessing settings values from views """
+
     def __init__(self, view):
         self.view = view
 
