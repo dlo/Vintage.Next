@@ -102,9 +102,9 @@
   { "keys": ["u"], "command": "vi_lower_case", "context": [ {"key": "vi_mode_visual"}]},
   { "keys": ["U"], "command": "vi_upper_case", "context": [ {"key": "vi_mode_visual"}]},
 
-  { "keys": ["d"], "command": "vi_set_action", "args": {"name": "delete"}, "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["y"], "command": "vi_set_action", "args": {"name": "copy"}, "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["c"], "command": "vi_set_action", "args": {"name": "change"}, "context": [{"key": "vi_mode_motion"}]}
+  { "keys": ["d"], "command": "vi_delete", "args": {"name": "delete"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["y"], "command": "vi_copy", "args": {"name": "copy"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["c"], "command": "vi_change", "args": {"name": "change"}, "context": [{"key": "vi_mode_motion"}]}
 
   /*
 
