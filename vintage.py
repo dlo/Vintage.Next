@@ -6,32 +6,151 @@ MOTION_MODE_NORMAL = 0
 # Used in visual line mode: Motions are extended to BOL and EOL.
 MOTION_MODE_LINE = 2
 
-MODE_NORMAL = 0
-MODE_VISUAL = 1
-MODE_SELECT = 2
-MODE_INSERT = 3
-MODE_COMMAND_LINE = 4
-MODE_EX = 5
-MODE_OP_PENDING = 6
-MODE_REPLACE = 7
-MODE_VIRTUAL_REPLACE = 8
-MODE_INSERT_NORMAL = 9
-MODE_INSERT_VISUAL = 10
+MODE_NORMAL = 0b1
+MODE_VISUAL = 0b10
+MODE_SELECT = 0b100
+MODE_INSERT = 0b1000
+MODE_COMMAND_LINE = 0b10000
+MODE_EX = 0b100000
+MODE_OP_PENDING = 0b1000000
+MODE_REPLACE = 0b10000000
+MODE_VIRTUAL_REPLACE = 0b100000000
+MODE_INSERT_NORMAL = 0b1000000000
+MODE_INSERT_VISUAL = 0b10000000000
+MODE_VISUAL_LINE = 0b100000000000
+
+ACTION_DELETE_CHAR = 0
+ACTION_DELETE_LINE = 1
+ACTION_DELETE_EOL = 2
+
+MODE_MAPPING = {
+    'vi_mode_normal': MODE_NORMAL,
+    'vi_mode_insert': MODE_INSERT,
+    'vi_mode_visual_line': MODE_VISUAL_LINE,
+    'vi_mode_visual': MODE_VISUAL | MODE_VISUAL_LINE,
+    'vi_mode_motion': MODE_NORMAL | MODE_VISUAL | MODE_VISUAL_LINE,
+}
 
 # Registers are used for clipboards and macro storage
 g_registers = {}
 
-class VintageStatus(object):
-    def __init__(self):
-        self.mode = MODE_NORMAL
+class SublimeSettings(object):
+    def __init__(self, view):
+        self.view = view
 
-        # Any verb, e.g., dyxprcuJ
-        self.verb = None
+    def __getitem__(self, key):
+        return self.view.settings().get(key)
 
+    def __setitem__(self, key, value):
+        self.view.settings().set(key, value)
+
+
+class VintageState(object):
+    def __init__(self, view):
+        self.view = view
+        self.settings = SublimeSettings(self.view)
+
+        self._count = self.settings['count']
+        self._action = self.settings['action']
+        self._followup_mode = self.settings['followup_mode']
         self.noun = None
 
         # A motion key, such as 0-9 or hjkltfaibwH
         self.adjective = None
+
+    def mode_matches_context(self, key):
+        return MODE_MAPPING[key] & self.mode == self.mode
+
+    @property
+    def followup_mode(self):
+        return self._followup_mode
+
+    @followup_mode.setter
+    def followup_mode(self, value):
+        self.settings['followup_mode'] = value
+        self._followup_mode = value
+
+    @property
+    def action(self):
+        return self._action
+
+    @action.setter
+    def action(self, new_action):
+        self.settings['action'] = new_action
+        self._action = new_action
+
+    @property
+    def count(self):
+        if self._count is None:
+            return 1
+        else:
+            return int(self._count)
+
+    @count.setter
+    def count(self, count):
+        self._count = count
+        self.settings['count'] = self._count
+        self.update_status_line()
+
+    @count.deleter
+    def count(self):
+        self.count = None
+
+    def push_digit(self, digit):
+        if self._count is None:
+            self.count = digit
+        else:
+            self.count = self._count * 10 + digit
+        self.update_status_line()
+
+    @property
+    def mode(self):
+        mode = self.settings['mode']
+        if mode is not None:
+            return mode
+        else:
+            self.settings['mode'] = MODE_NORMAL
+        return MODE_NORMAL
+
+    @mode.setter
+    def mode(self, new_mode):
+        self.settings['mode'] = new_mode
+        if new_mode == MODE_NORMAL:
+            del self.count
+
+        inverse_caret_state = new_mode in (MODE_NORMAL, MODE_VISUAL, MODE_VISUAL_LINE)
+        self.view.settings().set('inverse_caret_state', inverse_caret_state)
+        self.update_status_line()
+
+    def update_status_line(self):
+        desc = []
+        if self.mode == MODE_NORMAL:
+            desc = ["NORMAL MODE"]
+        elif self.mode == MODE_VISUAL:
+            desc = ["VISUAL MODE"]
+        elif self.mode == MODE_VISUAL_LINE:
+            desc = ["VISUAL LINE MODE"]
+        elif self.mode == MODE_INSERT:
+            desc = ["INSERT MODE"]
+        elif self.mode == MODE_REPLACE:
+            pass
+        elif self.mode == MODE_EX:
+            pass
+        elif self.mode == MODE_SELECT:
+            pass
+        elif self.mode == MODE_INSERT_VISUAL:
+            pass
+        elif self.mode == MODE_INSERT_NORMAL:
+            pass
+        elif self.mode == MODE_COMMAND_LINE:
+            pass
+        elif self.mode == MODE_OP_PENDING:
+            pass
+
+        if self._count is not None:
+            desc.append(str(self.count))
+
+        self.view.set_status('mode', ' - '.join(desc))
 
 # Represents the current input state. The primary commands that interact with
 # this are:
@@ -52,13 +171,23 @@ class Vintage(object):
         self.motion_inclusive = False
         self.motion_clip_to_line = False
         self.register = None
-        self.modes = {}
+        self.states = {}
         self.mode = MODE_NORMAL
 
+    def __getitem__(self, key):
+        return self.states.setdefault(key, VintageState())
+
     def set_motion_mode(self, view, mode):
-        self.modes[view] = mode
+        self.states[view] = mode
         self.motion_mode = mode
         self.update_status_line(view)
+
+    def reset_all(self):
+        for window in sublime.windows():
+            for view in window.views():
+                view.settings().set('command_mode', False)
+                view.settings().set('inverse_caret_state', False)
+                view.erase_status('mode')
 
     def reset(self, view, reset_motion_mode=True):
         self.prefix_repeat_digits = []
@@ -72,48 +201,13 @@ class Vintage(object):
         self.motion_inclusive = False
         self.motion_clip_to_line = False
         self.register = None
-        self.modes = {}
+        self.states = {}
         if reset_motion_mode:
             self.set_motion_mode(view, MOTION_MODE_NORMAL)
 
-    def update_status_line2(self, view):
-        desc = []
-        try:
-            vintage_status = self.modes.setdefault(view, VintageStatus())
-        except KeyError:
-            pass
-        else:
-            if vintage_status.mode == MODE_NORMAL:
-                desc = ["NORMAL MODE"]
-                if self.action_command is not None:
-                    if self.action_description:
-                        desc.append(self.action_description)
-                    else:
-                        desc.append(self.action_command)
-            elif vintage_status.mode == MODE_VISUAL:
-                desc = ["VISUAL MODE"]
-            elif vintage_status.mode == MODE_INSERT:
-                desc = ["INSERT MODE"]
-            elif vintage_status.mode == MODE_REPLACE:
-                pass
-            elif vintage_status.mode == MODE_EX:
-                pass
-            elif vintage_status.mode == MODE_SELECT:
-                pass
-            elif vintage_status.mode == MODE_INSERT_VISUAL:
-                pass
-            elif vintage_status.mode == MODE_INSERT_NORMAL:
-                pass
-            elif vintage_status.mode == MODE_COMMAND_LINE:
-                pass
-            elif vintage_status.mode == MODE_OP_PENDING:
-                pass
-
-        finally:
-            pass
-
     # Updates the status bar to reflect the current mode and input state
     def update_status_line(self, view):
+        return
         if view.settings().get('command_mode'):
             if self.motion_mode == MOTION_MODE_LINE:
                 desc = ['VISUAL LINE MODE']
@@ -156,14 +250,75 @@ def string_to_motion_mode(mode):
     else:
         return -1
 
+
+class ViEnterInsertMode(sublime_plugin.TextCommand):
+    def is_visible(self):
+        vintage_state = VintageState(self.view)
+        return vintage_state.mode != MODE_INSERT
+
+    def run(self, edit, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_INSERT
+        if 'action' in kwargs:
+            if 'action_args' in kwargs:
+                self.view.run_command(kwargs['action'], kwargs['action_args'])
+            else:
+                self.view.run_command(kwargs['action'])
+
+
+class ViEnterVisualMode(sublime_plugin.TextCommand):
+    def run(self, edit, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_VISUAL
+
+
+class ViEnterSelectMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+
+class ViEnterNormalMode(sublime_plugin.TextCommand):
+    def run(self, edit, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_NORMAL
+
+
+class ViEnterReplaceMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+
+class ViEnterVisualLineMode(sublime_plugin.TextCommand):
+    def run(self, edit, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_VISUAL_LINE
+
+
+class ViEnterVirtualReplaceMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+class ViEnterInsertNormalMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+class ViEnterInsertVisualMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+class ViEnterExMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+class ViEnterOpPendingMode(sublime_plugin.TextCommand):
+    """ Not implemented """
+    pass
+
+
 # Called when the plugin is unloaded (e.g., perhaps it just got added to
 # ignored_packages). Ensure files aren't left in command mode.
 def unload_handler():
-    for w in sublime.windows():
-        for v in w.views():
-            v.settings().set('command_mode', False)
-            v.settings().set('inverse_caret_state', False)
-            v.erase_status('mode')
+    vintage.reset_all()
 
 # Ensures the input state is reset when the view changes, or the user selects
 # with the mouse or non-vintage key bindings
@@ -195,8 +350,7 @@ class InputStateTracker(sublime_plugin.EventListener):
         vintage.reset(view, False)
         # Get out of visual line mode if the selection has changed, e.g., due
         # to clicking with the mouse
-        if (vintage.motion_mode == MOTION_MODE_LINE and
-            not view.has_non_empty_selection_region()):
+        if (vintage.motion_mode == MOTION_MODE_LINE and not view.has_non_empty_selection_region()):
             vintage.motion_mode = MOTION_MODE_NORMAL
         vintage.update_status_line(view)
 
@@ -211,6 +365,11 @@ class InputStateTracker(sublime_plugin.EventListener):
         self.on_load(view)
 
     def on_query_context(self, view, key, operator, operand, match_all):
+        if key.startswith("vi_mode"):
+            vintage_state = VintageState(view)
+            return vintage_state.mode_matches_context(key)
+        return False
+
         if key == "vi_action" and vintage.action_command:
             if operator == sublime.OP_EQUAL:
                 return operand == vintage.action_command
@@ -332,6 +491,61 @@ def digits_to_number(digits):
         number += place * int(d)
         place *= 10
     return number
+
+class ViMove(sublime_plugin.TextCommand):
+    def run(self, action, **kwargs):
+        args = {}
+        args['by'] = kwargs.get('by', "characters")
+        args['forward'] = kwargs.get('forward', True)
+        if args['by'] == "WORDS":
+            args['by'] = "stops"
+            args['word_begin'] = True
+            args['empty_line'] = True
+            args['separators'] = ""
+        elif args['by'] == "words":
+            args['by'] = "stops"
+            args['word_begin'] = True
+            args['punct_begin'] = True
+            args['empty_line'] = True
+        elif args['by'] == "paragraphs":
+            args['by'] = "stops"
+            args['word_begin'] = False
+            args['empty_line'] = True
+            args['separators'] = ""
+
+        vintage_state = VintageState(self.view)
+        for i in range(min(100000, vintage_state.count)):
+            old_row, _ = self.view.rowcol(self.view.sel()[0].begin())
+            self.view.run_command("move", args)
+            new_row, _ = self.view.rowcol(self.view.sel()[0].begin())
+            if new_row == old_row:
+                break
+
+        del vintage_state.count
+        vintage_state.update_status_line()
+
+
+class ViGotoLine(sublime_plugin.TextCommand):
+    def run(self, action, **kwargs):
+        vintage_state = VintageState(self.view)
+        if not vintage_state._count:
+            self.view.run_command("move_to", {'to': "eof"})
+        else:
+            self.view.run_command("goto_line", {'line': vintage_state.count})
+            del vintage_state.count
+
+
+class ViPushDigit(sublime_plugin.TextCommand):
+    def run(self, action, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.push_digit(kwargs['digit'])
+
+
+class ViSetAction(sublime_plugin.TextCommand):
+    def run(self, action, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.action = kwargs['name']
+
 
 # Set the current motion in the input state. Note that this won't create an
 # entry on the undo stack: only eval_input does this.
@@ -815,15 +1029,17 @@ class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
         transform_selection_regions(self.view, self.shrink)
 
-class VisualUpperCase(sublime_plugin.TextCommand):
+class ViUpperCase(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command("upper_case")
-        self.view.run_command("exit_visual_mode")
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_NORMAL
 
-class VisualLowerCase(sublime_plugin.TextCommand):
+class ViLowerCase(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command("lower_case")
-        self.view.run_command("exit_visual_mode")
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_NORMAL
 
 # Sequence is used as part of glue_marked_undo_groups: the marked undo groups
 # are rewritten into a single sequence command, that accepts all the previous
