@@ -299,7 +299,6 @@ class InputStateTracker(sublime_plugin.EventListener):
                 if v.settings().get("vintage_start_in_command_mode"):
                     v.settings().set('command_mode', True)
                     v.settings().set('inverse_caret_state', True)
-                vintage.update_status_line(v)
 
     def on_activated(self, view):
         vintage.reset(view)
@@ -322,7 +321,6 @@ class InputStateTracker(sublime_plugin.EventListener):
         # to clicking with the mouse
         if (vintage.motion_mode == MOTION_MODE_LINE and not view.has_non_empty_selection_region()):
             vintage.motion_mode = MOTION_MODE_NORMAL
-        vintage.update_status_line(view)
 
     def on_load(self, view):
         if view.settings().get("vintage_start_in_command_mode"):
@@ -425,7 +423,6 @@ class PushRepeatDigit(sublime_plugin.TextCommand):
             vintage.motion_repeat_digits.append(digit)
         else:
             vintage.prefix_repeat_digits.append(digit)
-        vintage.update_status_line(self.view)
 
 # Set the current action in the input state. Note that this won't create an
 # entry on the undo stack: only eval_input does this.
@@ -448,8 +445,6 @@ class SetAction(sublime_plugin.TextCommand):
             # Currently in visual mode, so no following motion is expected:
             # eval the current input
             eval_input(self.view)
-        else:
-            vintage.update_status_line(self.view)
 
 def digits_to_number(digits):
     if len(digits) == 0:
@@ -616,7 +611,6 @@ class SetRegister(sublime_plugin.TextCommand):
 
     def run(self, character):
         vintage.register = character
-        vintage.update_status_line(self.view)
 
 def clip_point_to_line(view, f, pt):
     l = view.line(pt)
@@ -925,7 +919,6 @@ class EnterInsertMode(sublime_plugin.TextCommand):
 
         self.view.settings().set('command_mode', False)
         self.view.settings().set('inverse_caret_state', False)
-        vintage.update_status_line(self.view)
 
 class ExitInsertMode(sublime_plugin.TextCommand):
     def run_(self, args):
@@ -951,7 +944,6 @@ class ExitInsertMode(sublime_plugin.TextCommand):
         if not self.view.has_non_empty_selection_region():
             self.view.run_command('vi_move_by_characters_in_line', {'forward': False})
 
-        vintage.update_status_line(self.view)
 
 class EnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit):
