@@ -1,4 +1,5 @@
 [
+/*
     { "keys": ["ctrl+c"], "command": "exit_insert_mode",
         "context":
         [
@@ -17,6 +18,8 @@
             { "key": "setting.vintage_ctrl_keys" }
         ]
     },
+
+    { "keys": ["ctrl+x"], "command": "vi_test", "args": {"name": "Dan"}},
 
     { "keys": ["ctrl+c"], "command": "vi_cancel_current_action",
         "context":
@@ -117,4 +120,5 @@
         "inclusive": true },
         "context": [{"key": "setting.command_mode"}]
     }
+    */
 ]
