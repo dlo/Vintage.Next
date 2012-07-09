@@ -27,6 +27,9 @@ class Registers(dict):
         """
         assert len(name) == 1, "Register names must be 1 char long."
 
+        if name == Registers.REG_NULL:
+            return
+
         if isinstance(name, int):
             name = unicode(name)
         if (not (name.isalpha() or name.isdigit())) or name.isupper():
