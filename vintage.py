@@ -30,8 +30,25 @@ MODE_MAPPING = {
     'vi_mode_normal': MODE_NORMAL,
     'vi_mode_insert': MODE_INSERT,
     'vi_mode_visual_line': MODE_VISUAL_LINE,
-    'vi_mode_visual': MODE_VISUAL | MODE_VISUAL_LINE,
+    'vi_mode_visual_all': MODE_VISUAL | MODE_VISUAL_LINE,
     'vi_mode_motion': MODE_NORMAL | MODE_VISUAL | MODE_VISUAL_LINE,
+}
+
+ACTION_FOLLOWUP_MODES = {
+    'q': MODE_NORMAL,
+    'r': MODE_NORMAL,
+    'o': MODE_INSERT,
+    'O': MODE_INSERT,
+    'a': MODE_INSERT,
+    'A': MODE_INSERT,
+    'd': MODE_NORMAL,
+    'D': MODE_NORMAL,
+    's': MODE_INSERT,
+    'S': MODE_INSERT,
+    'x': MODE_NORMAL,
+    'X': MODE_NORMAL,
+    'c': MODE_INSERT,
+    'C': MODE_INSERT,
 }
 
 # Registers are used for clipboards and macro storage
@@ -50,19 +67,56 @@ class SublimeSettings(object):
         self.view.settings().set(key, value)
 
 
+
+class Direction:
+    UP = 0b0000
+    RIGHT = 0b0010
+    DOWN = 0b0100
+    LEFT = 0b1000
+
+
 class VintageState(object):
     def __init__(self, view):
         self.view = view
         self.settings = SublimeSettings(self.view)
 
-        self._count = self.settings['count']
+        # By default, every command is executed once.
+        self.digits = self.settings['count']
+        if not self.digits:
+            self.digits = []
+
         self._action = self.settings['action']
+
+        # These are the commands that have been entered so far in this
+        # sequence, minor the count modifiers (0-9).
+        # E.g., ['d', 'i']
+        self.stack = []
+
+        self.direction = None
+
+        # TODO (dlo): handle registers appropriately for commands prepended
+        # with "X, where X is the name of a register
+        self.target = pass
+
+        # This flag is set whenever we should reset the count modifier when
+        # accepting digit input.
+        self.reset_count = True
 
         # This is the mode the editor drops into after performing the action.
         self._followup_mode = self.settings['followup_mode']
 
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
+
+    @property
+    def ready_to_run(self):
+        if self.direction is None:
+            return False
+
+        if len(self.stack) == 0:
+            return False
+
+        return True
 
     @property
     def followup_mode(self):
@@ -84,26 +138,24 @@ class VintageState(object):
 
     @property
     def count(self):
-        if self._count is None:
+        if len(self.count) == 0:
             return 1
         else:
-            return int(self._count)
-
-    @count.setter
-    def count(self, count):
-        self._count = count
-        self.settings['count'] = self._count
-        self.update_status_line()
+            return int("".join(self.count))
 
     @count.deleter
     def count(self):
-        self.count = None
+        self.digits = []
+        self.settings['digits'] = self.digits
+        self.update_status_line()
 
     def push_digit(self, digit):
-        if self._count is None:
-            self.count = digit
-        else:
-            self.count = self._count * 10 + digit
+        if self.reset_count:
+            self.reset_count = False
+            del self.count
+
+        self.digits.append(digit)
+        self.settings['digits'] = self.digits
         self.update_status_line()
 
     @property

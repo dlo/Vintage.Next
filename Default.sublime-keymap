@@ -76,8 +76,8 @@
   { "keys": ["u"], "command": "undo", "context": [{"key": "vi_mode_normal"}] },
   { "keys": ["ctrl+r"], "command": "redo", "context": [{"key": "vi_mode_normal"}, {"key": "setting.vintage_ctrl_keys"}]},
 
-  { "keys": ["u"], "command": "vi_lower_case", "context": [ {"key": "vi_mode_visual"}]},
-  { "keys": ["U"], "command": "vi_upper_case", "context": [ {"key": "vi_mode_visual"}]},
+  { "keys": ["u"], "command": "vi_lower_case", "context": [ {"key": "vi_mode_visual_all"}]},
+  { "keys": ["U"], "command": "vi_upper_case", "context": [ {"key": "vi_mode_visual_all"}]},
 
   { "keys": ["d"], "command": "vi_delete", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["y"], "command": "vi_copy", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
