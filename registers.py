@@ -13,8 +13,9 @@ class Registers(dict):
     REG_LAST_INSERTED_TEXT = '.'
     REG_FILE_NAME = '%'
     REG_ALT_FILE_NAME = '#'
+    REG_SYS_CLIPBOARD = '*'
     REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
-               REG_FILE_NAME, REG_ALT_FILE_NAME)
+               REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD)
     # todo(guillermo): there are more
 
     def _set_default_register(self, value):
@@ -45,6 +46,7 @@ class Registers(dict):
         """
         assert len(name) == 1, "Register names must be 1 char long."
 
+        # fixme(guillermooo): 0-9 cannot be appended to.
         if isinstance(name, int):
             name = unicode(name)
         if name.islower() or not name.isalpha():
@@ -57,6 +59,7 @@ class Registers(dict):
     def get(self, name):
         assert len(name) == 1, "Register names must be 1 char long."
 
+        # Did we request a special register?
         if name == Registers.REG_NULL:
             return
         elif name == Registers.REG_FILE_NAME:
@@ -66,9 +69,13 @@ class Registers(dict):
                 return os.path.basename(v)
             except AttributeError:
                 return ''
+        elif name == Registers.REG_SYS_CLIPBOARD:
+            return sublime.get_clipboard()
         elif name != Registers.REG_DEFAULT and name in Registers.REG_ALL:
             return None
 
+        # We requestested an a-z register.
+        # In Vim, "A and "a seem to be synonyms.
         try:
             return self.__dict__[name.lower()]
         except KeyError:
@@ -83,4 +90,6 @@ class Registers(dict):
             if key.isupper():
                 self.append_to(key, value)
         except AttributeError:
+            self.set(key, value)
+        else:
             self.set(key, value)
