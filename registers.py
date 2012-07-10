@@ -87,7 +87,7 @@ class Registers(dict):
         try:
             if key.isupper():
                 self.append_to(key, value)
+            else:
+                self.set(key, value)
         except AttributeError:
-            self.set(key, value)
-        else:
             self.set(key, value)
