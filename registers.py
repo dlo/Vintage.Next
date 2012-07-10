@@ -13,6 +13,8 @@ class Registers(dict):
     REG_LAST_INSERTED_TEXT = '.'
     REG_FILE_NAME = '%'
     REG_ALT_FILE_NAME = '#'
+    # todo(guillermo): implement vintage_use_sys_clipboard option to always
+    # propagate registers to the system clipboard.
     REG_SYS_CLIPBOARD = '*'
     REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
                REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD)
@@ -33,6 +35,7 @@ class Registers(dict):
 
         if isinstance(name, int):
             name = unicode(name)
+        # Special registers and invalid registers won't be set.
         if (not (name.isalpha() or name.isdigit())) or name.isupper():
             # Vim fails silently.
             # raise Exception("Can only set a-z and 0-9 registers.")
@@ -45,13 +48,8 @@ class Registers(dict):
         Appends to an a-z register. `name` must be a capital in A-Z.
         """
         assert len(name) == 1, "Register names must be 1 char long."
+        assert ord(name) in xrange(ord('A'), ord('Z') + 1), "Can only append to A-Z registers."
 
-        # fixme(guillermooo): 0-9 cannot be appended to.
-        if isinstance(name, int):
-            name = unicode(name)
-        if name.islower() or not name.isalpha():
-            # todo(guillermo): maybe fail silently?
-            raise Exception("Can only append to A-Z registers.")
         existing = self.__dict__.get(name.lower(), '')
         self.__dict__[name.lower()] = existing + value
         self._set_default_register(self[name.lower()])
