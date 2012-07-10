@@ -33,9 +33,9 @@ class Registers(dict):
         if isinstance(name, int):
             name = unicode(name)
         if (not (name.isalpha() or name.isdigit())) or name.isupper():
-                # Vim fails silently.
-                # raise Exception("Can only set a-z and 0-9 registers.")
-                return None
+            # Vim fails silently.
+            # raise Exception("Can only set a-z and 0-9 registers.")
+            return None
         self.__dict__[name] = value
         self._set_default_register(value)
 
