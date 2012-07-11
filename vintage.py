@@ -67,7 +67,6 @@ class SublimeSettings(object):
         self.view.settings().set(key, value)
 
 
-
 class Direction:
     UP = 0b0000
     RIGHT = 0b0010
@@ -96,7 +95,7 @@ class VintageState(object):
 
         # TODO (dlo): handle registers appropriately for commands prepended
         # with "X, where X is the name of a register
-        self.target = pass
+        # self.target = pass
 
         # This flag is set whenever we should reset the count modifier when
         # accepting digit input.
@@ -138,10 +137,10 @@ class VintageState(object):
 
     @property
     def count(self):
-        if len(self.count) == 0:
+        if len(self.digits) == 0:
             return 1
         else:
-            return int("".join(self.count))
+            return int("".join(self.digits))
 
     @count.deleter
     def count(self):
@@ -154,8 +153,10 @@ class VintageState(object):
             self.reset_count = False
             del self.count
 
-        self.digits.append(digit)
+        self.digits.append(str(digit))
         self.settings['digits'] = self.digits
+        print self.digits
+        print self.settings['digits']
         self.update_status_line()
 
     @property
@@ -202,7 +203,7 @@ class VintageState(object):
         elif self.mode == MODE_OP_PENDING:
             pass
 
-        if self._count is not None:
+        if self.count is not None:
             desc.append(str(self.count))
 
         self.view.set_status('mode', ' - '.join(desc))
@@ -235,7 +236,6 @@ class Vintage(object):
     def set_motion_mode(self, view, mode):
         self.states[view] = mode
         self.motion_mode = mode
-        self.update_status_line(view)
 
     def reset_all(self):
         for window in sublime.windows():
@@ -532,7 +532,7 @@ class ViMove(sublime_plugin.TextCommand):
 
         vintage_state = VintageState(self.view)
 
-        if vintage_state.mode_matches_context("vi_mode_visual"):
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
             args['extend'] = True
 
         for i in range(min(100000, vintage_state.count)):
@@ -551,8 +551,8 @@ class ViGotoLine(sublime_plugin.TextCommand):
         vintage_state = VintageState(self.view)
 
         args = {}
-        if not vintage_state._count:
-            if vintage_state.mode_matches_context("vi_mode_visual"):
+        if len(vintage_state.digits) == 0:
+            if vintage_state.mode_matches_context("vi_mode_visual_all"):
                 args['extend'] = True
 
             args['to'] = "eof"
