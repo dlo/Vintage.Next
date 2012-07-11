@@ -29,8 +29,9 @@ class Registers(dict):
                REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD)
     # todo(guillermo): there are more
 
-    def __init__(self, view):
+    def __init__(self, view, settings):
         self.view = view
+        self.settings = settings
 
     def __get__(self, obj, type):
         # This ensures that we can easiy access the active view.
