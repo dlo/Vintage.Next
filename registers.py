@@ -33,7 +33,7 @@ class Registers(dict):
 
     def __get__(self, obj, type):
         # This ensures that we can easiy access the active view.
-        return Registers(obj.view)
+        return Registers(obj.view, obj.settings)
 
     def _set_default_register(self, value):
         # todo(guillermo): could be made a decorator.
