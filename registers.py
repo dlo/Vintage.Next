@@ -1,12 +1,21 @@
 import sublime
 import os
 
-# todo(guillermo): some operations will require a view. fix that.
+
 class Registers(dict):
     """
     Registers hold global data mainly used by yank, delete and paste.
-    Create only one instance of this class.
+
+    This class is meant to be used a descriptor.
+
+        class VintageState(object):
+            ...
+            self.registers = Registers()
+
+        vstate = VintageState()
+        vstate.registers["%"] # now vstate has access to the current view.
     """
+
     REG_DEFAULT = '"'
     REG_SMALL_DELETE = '-'
     REG_NULL = '_'
@@ -19,6 +28,13 @@ class Registers(dict):
     REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
                REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD)
     # todo(guillermo): there are more
+
+    def __init__(self, view):
+        self.view = view
+
+    def __get__(self, obj, type):
+        # This ensures that we can easiy access the active view.
+        return Registers(obj.view)
 
     def _set_default_register(self, value):
         # todo(guillermo): could be made a decorator.
@@ -62,9 +78,7 @@ class Registers(dict):
             return
         elif name == Registers.REG_FILE_NAME:
             try:
-                # todo(guillermo): there must be a better way of doing this.
-                v = sublime.active_window().active_view().file_name()
-                return os.path.basename(v)
+                return os.path.basename(self.view)
             except AttributeError:
                 return ''
         elif name == Registers.REG_SYS_CLIPBOARD:
