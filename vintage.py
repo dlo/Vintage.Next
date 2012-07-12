@@ -536,7 +536,14 @@ class ViMove(sublime_plugin.TextCommand):
         if vintage_state.mode_matches_context("vi_mode_visual_all"):
             args['extend'] = True
 
-        for i in range(min(100000, vintage_state.count)):
+        repeat_count = vintage_state.count
+
+        count = 0
+        while True:
+            count += 1
+            if count > repeat_count:
+                break
+
             old_row, _ = self.view.rowcol(self.view.sel()[0].begin())
             self.view.run_command("move", args)
             new_row, _ = self.view.rowcol(self.view.sel()[0].begin())
