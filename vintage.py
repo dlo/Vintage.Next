@@ -1185,53 +1185,6 @@ class ViPasteLeft(ViPrefixableCommand):
                                                       'repeat': repeat,
                                                       'register': register})
 
-def set_register(view, register, forward):
-    delta = 1
-    if not forward:
-        delta = -1
-
-    text = []
-    regions = []
-    for s in view.sel():
-        if s.empty():
-            s = sublime.Region(s.a, s.a + delta)
-        text.append(view.substr(s))
-        regions.append(s)
-
-    text = '\n'.join(text)
-
-    use_sys_clipboard = view.settings().get('vintage_use_clipboard', False) == True
-
-    if (use_sys_clipboard and register == '"') or (register in ('*', '+')):
-        sublime.set_clipboard(text)
-        # If the system's clipboard is used, Vim always propagates the data to
-        # the unnamed register too.
-        register = '"'
-
-    if register == '%':
-        pass
-    else:
-        reg = register.lower()
-        append = (reg != register)
-
-        if append and reg in g_registers:
-            g_registers[reg] += text
-        else:
-            g_registers[reg] = text
-
-def get_register(view, register):
-    use_sys_clipboard = view.settings().get('vintage_use_clipboard', False) == True
-    register = register.lower()
-    if register == '%':
-        if view.file_name():
-            return os.path.basename(view.file_name())
-        else:
-            return None
-    elif (use_sys_clipboard and register == '"') or (register in ('*', '+')):
-        return sublime.get_clipboard()
-    else:
-        return g_registers.get(register, None)
-
 def has_register(register):
     if register in ['%', '*', '+']:
         return True
