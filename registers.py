@@ -100,7 +100,7 @@ class Registers(dict):
             return
         # Special case lumped among these --user always wants the sys
         # clipboard.
-        elif self.settings.vintage_use_sys_clipboard == True:
+        elif name == REG_DEFAULT and self.settings.vintage_use_sys_clipboard == True:
             return sublime.get_clipboard()
 
         # We requested an [a-z0-9"] register.
