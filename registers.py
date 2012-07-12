@@ -13,7 +13,8 @@ class Registers(dict):
             self.registers = Registers()
 
         vstate = VintageState()
-        vstate.registers["%"] # now vstate has access to the current view.
+        vstate.registers["%"] # now vstate.registers has access to the
+                              # current view.
     """
 
     REG_DEFAULT = '"'
