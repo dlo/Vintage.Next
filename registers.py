@@ -2,6 +2,21 @@ import sublime
 import os
 
 
+REG_DEFAULT = '"'
+REG_SMALL_DELETE = '-'
+REG_NULL = '_'
+REG_LAST_INSERTED_TEXT = '.'
+REG_FILE_NAME = '%'
+REG_ALT_FILE_NAME = '#'
+REG_SYS_CLIPBOARD_1 = '*'
+REG_SYS_CLIPBOARD_2 = '+'
+REG_SYS_CLIPBOARD_ALL = (REG_SYS_CLIPBOARD_1, REG_SYS_CLIPBOARD_2)
+REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
+           REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD_1,
+           REG_SYS_CLIPBOARD_2)
+# todo(guillermo): there are more
+
+
 class Registers(dict):
     """
     Registers hold global data mainly used by yank, delete and paste.
@@ -16,16 +31,6 @@ class Registers(dict):
         vstate.registers["%"] # now vstate has access to the current view.
     """
 
-    REG_DEFAULT = '"'
-    REG_SMALL_DELETE = '-'
-    REG_NULL = '_'
-    REG_LAST_INSERTED_TEXT = '.'
-    REG_FILE_NAME = '%'
-    REG_ALT_FILE_NAME = '#'
-    REG_SYS_CLIPBOARD = '*'
-    REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
-               REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD)
-    # todo(guillermo): there are more
 
     def __init__(self, view, settings):
         self.view = view
@@ -37,7 +42,7 @@ class Registers(dict):
 
     def _set_default_register(self, value):
         # todo(guillermo): could be made a decorator.
-        self.__dict__[Registers.REG_DEFAULT] = value
+        self.__dict__[REG_DEFAULT] = value
 
     def _maybe_set_sys_clipboard(self, value):
         # We actually need to check whether the option is set to a bool; could
@@ -49,9 +54,9 @@ class Registers(dict):
         """
         Sets an a-z or 0-9 register.
         """
-        assert len(name) == 1, "Register names must be 1 char long."
+        assert len(str(name)) == 1, "Register names must be 1 char long."
 
-        if name == Registers.REG_NULL:
+        if name == REG_NULL:
             return
 
         if isinstance(name, int):
@@ -78,20 +83,20 @@ class Registers(dict):
         self._set_default_register(new_value)
         self._maybe_set_sys_clipboard(new_value)
 
-    def get(self, name=Registers.REG_DEFAULT):
-        assert len(name) == 1, "Register names must be 1 char long."
+    def get(self, name=REG_DEFAULT):
+        assert len(str(name)) == 1, "Register names must be 1 char long."
 
         # Did we request a special register?
-        if name == Registers.REG_NULL:
+        if name == REG_NULL:
             return
-        elif name == Registers.REG_FILE_NAME:
+        elif name == REG_FILE_NAME:
             try:
-                return os.path.basename(self.view)
+                return os.path.basename(self.view.file_name())
             except AttributeError:
                 return ''
-        elif name == Registers.REG_SYS_CLIPBOARD:
+        elif name in REG_SYS_CLIPBOARD_ALL:
             return sublime.get_clipboard()
-        elif name != Registers.REG_DEFAULT and name in Registers.REG_ALL:
+        elif name != REG_DEFAULT and name in REG_ALL:
             return
         # Special case lumped among these --user always wants the sys
         # clipboard.
