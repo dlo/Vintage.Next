@@ -613,14 +613,6 @@ class ViSetAction(sublime_plugin.TextCommand):
         vintage_state = VintageState(self.view)
 
 
-class ViD(sublime_plugin.TextCommand):
-    def run(self, edit, **kwargs):
-        args = parse_motion(**kwargs)
-        vintage_state = VintageState(self.view)
-        vintage_state.motion = {"forward": true, "by": "lines"}
-        vintage_state.action = ACTION_DELETE
-        vintage_state.run()
-
 # Set the current motion in the input state. Note that this won't create an
 # entry on the undo stack: only eval_input does this.
 class SetMotion(sublime_plugin.TextCommand):
