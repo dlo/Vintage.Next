@@ -94,7 +94,7 @@ class VintageState(object):
             self.digits = []
 
         self._action = self.settings['action']
-        self.motion = None
+        self._motion = self.settings['motion']
 
         # TODO (dlo): handle registers appropriately for commands prepended
         # with "X, where X is the name of a register
@@ -113,9 +113,14 @@ class VintageState(object):
     def direction(self):
         return Direction.from_motion(self.motion)
 
-    def set_motion(self, args):
-        self.motion = args
-        self.settings['motion'] = args
+    @property
+    def motion(self):
+        return self._motion
+
+    @motion.setter
+    def motion(self, value):
+        self.motion = value
+        self.settings['motion'] = value
 
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
@@ -550,7 +555,7 @@ class ViSetMotion(sublime_plugin.TextCommand):
             args['extend'] = True
 
         vintage_state = VintageState(self.view)
-        vintage_state.set_motion(args)
+        vintage_state.motion = args
         vintage_state.run()
 
 
@@ -612,7 +617,7 @@ class ViD(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         args = parse_motion(**kwargs)
         vintage_state = VintageState(self.view)
-        vintage_state.set_motion({"forward": true, "by": "lines"})
+        vintage_state.motion = {"forward": true, "by": "lines"}
         vintage_state.action = ACTION_DELETE
         vintage_state.run()
 
