@@ -94,12 +94,6 @@ class VintageState(object):
             self.digits = []
 
         self._action = self.settings['action']
-
-        # These are the commands that have been entered so far in this
-        # sequence, minor the count modifiers (0-9).
-        # E.g., ['d', 'i']
-        self.stack = []
-
         self.motion = None
 
         # TODO (dlo): handle registers appropriately for commands prepended
