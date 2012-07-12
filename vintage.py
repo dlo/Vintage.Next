@@ -127,22 +127,19 @@ class VintageState(object):
         return MODE_MAPPING[key] & self.mode == self.mode
 
     def run(self):
-        if len(self.stack) == 0:
+        if self.action is None:
             pass
         else:
             if self.motion is None:
                 pass
             else:
-                pass
+                if self.action == ACTION_DELETE:
+                    pass
 
     @property
     def followup_mode(self):
+        """ This is extrapolated directly from the action stack """
         return self._followup_mode
-
-    @followup_mode.setter
-    def followup_mode(self, value):
-        self.settings['followup_mode'] = value
-        self._followup_mode = value
 
     @property
     def action(self):
@@ -527,27 +524,39 @@ def digits_to_number(digits):
     return number
 
 
+def parse_motion(**kwargs):
+    args = {}
+    args['by'] = kwargs.get('by', "characters")
+    args['forward'] = kwargs.get('forward', True)
+    if args['by'] == "WORDS":
+        args['by'] = "stops"
+        args['word_begin'] = True
+        args['empty_line'] = True
+        args['separators'] = ""
+    elif args['by'] == "words":
+        args['by'] = "stops"
+        args['word_begin'] = True
+        args['punct_begin'] = True
+        args['empty_line'] = True
+    elif args['by'] == "paragraphs":
+        args['by'] = "stops"
+        args['word_begin'] = False
+        args['empty_line'] = True
+        args['separators'] = ""
+
+    return args
+
+class ViMotionCommand(sublime_plugin.TextCommand):
+    def run(self, action, **kwargs):
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
+            args['extend'] = True
+
+
 class ViSetMotion(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
-        args = {}
-        args['by'] = kwargs.get('by', "characters")
-        args['forward'] = kwargs.get('forward', True)
-        if args['by'] == "WORDS":
-            args['by'] = "stops"
-            args['word_begin'] = True
-            args['empty_line'] = True
-            args['separators'] = ""
-        elif args['by'] == "words":
-            args['by'] = "stops"
-            args['word_begin'] = True
-            args['punct_begin'] = True
-            args['empty_line'] = True
-        elif args['by'] == "paragraphs":
-            args['by'] = "stops"
-            args['word_begin'] = False
-            args['empty_line'] = True
-            args['separators'] = ""
+        args = parse_motion(**kwargs)
 
+        vintage_state = VintageState(self.view)
         if vintage_state.mode_matches_context("vi_mode_visual_all"):
             args['extend'] = True
 
@@ -558,27 +567,9 @@ class ViSetMotion(sublime_plugin.TextCommand):
 
 class ViMove(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
-        args = {}
-        args['by'] = kwargs.get('by', "characters")
-        args['forward'] = kwargs.get('forward', True)
-        if args['by'] == "WORDS":
-            args['by'] = "stops"
-            args['word_begin'] = True
-            args['empty_line'] = True
-            args['separators'] = ""
-        elif args['by'] == "words":
-            args['by'] = "stops"
-            args['word_begin'] = True
-            args['punct_begin'] = True
-            args['empty_line'] = True
-        elif args['by'] == "paragraphs":
-            args['by'] = "stops"
-            args['word_begin'] = False
-            args['empty_line'] = True
-            args['separators'] = ""
+        args = parse_motion(**kwargs)
 
         vintage_state = VintageState(self.view)
-
         if vintage_state.mode_matches_context("vi_mode_visual_all"):
             args['extend'] = True
 
