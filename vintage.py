@@ -540,11 +540,6 @@ def parse_motion(**kwargs):
 
     return args
 
-class ViMotionCommand(sublime_plugin.TextCommand):
-    def run(self, action, **kwargs):
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-
 
 class ViSetMotion(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
