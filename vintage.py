@@ -80,7 +80,7 @@ class VintageState(object):
         self.settings = SublimeSettings(self.view)
 
         # By default, every command is executed once.
-        self.digits = self.settings['count']
+        self.digits = self.settings['digits']
         if not self.digits:
             self.digits = []
 
@@ -99,7 +99,9 @@ class VintageState(object):
 
         # This flag is set whenever we should reset the count modifier when
         # accepting digit input.
-        self.reset_count = True
+        self.reset_count = self.settings['reset_count']
+        if self.reset_count is None:
+            self.reset_count = True
 
         # This is the mode the editor drops into after performing the action.
         self._followup_mode = self.settings['followup_mode']
@@ -150,13 +152,12 @@ class VintageState(object):
 
     def push_digit(self, digit):
         if self.reset_count:
+            self.settings['reset_count'] = False
             self.reset_count = False
             del self.count
 
         self.digits.append(str(digit))
         self.settings['digits'] = self.digits
-        print self.digits
-        print self.settings['digits']
         self.update_status_line()
 
     @property
