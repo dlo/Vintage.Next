@@ -19,12 +19,8 @@ MODE_INSERT_NORMAL = 1 << 9
 MODE_INSERT_VISUAL = 1 << 10
 MODE_VISUAL_LINE = 1 << 11
 
-ACTION_DELETE_CHARACTER = 0
-ACTION_DELETE_SELECTION = 1
-ACTION_DELETE_LINE = 2
-ACTION_COPY_CHARACTER = 3
-ACTION_COPY_SELECTION = 4
-ACTION_COPY_LINE = 5
+ACTION_DELETE = 1 << 0
+ACTION_COPY = 1 << 1
 
 MODE_MAPPING = {
     'vi_mode_normal': MODE_NORMAL,
@@ -68,10 +64,23 @@ class SublimeSettings(object):
 
 
 class Direction:
-    UP = 0b0000
-    RIGHT = 0b0010
-    DOWN = 0b0100
-    LEFT = 0b1000
+    UP = 1 << 0
+    RIGHT = 1 << 1
+    DOWN = 1 << 2
+    LEFT = 1 << 3
+
+    @staticmethod
+    def from_motion(motion):
+        if motion['forward']:
+            if motion['by'] == 'lines':
+                return Direction.DOWN
+            else:
+                return Direction.RIGHT
+        else:
+            if motion['by'] == 'lines':
+                return Direction.UP
+            else:
+                return Direction.LEFT
 
 
 class VintageState(object):
@@ -91,7 +100,7 @@ class VintageState(object):
         # E.g., ['d', 'i']
         self.stack = []
 
-        self.direction = None
+        self.motion = None
 
         # TODO (dlo): handle registers appropriately for commands prepended
         # with "X, where X is the name of a register
@@ -106,18 +115,25 @@ class VintageState(object):
         # This is the mode the editor drops into after performing the action.
         self._followup_mode = self.settings['followup_mode']
 
+    @property
+    def direction(self):
+        return Direction.from_motion(self.motion)
+
+    def set_motion(self, args):
+        self.motion = args
+        self.settings['motion'] = args
+
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
 
-    @property
-    def ready_to_run(self):
-        if self.direction is None:
-            return False
-
+    def run(self):
         if len(self.stack) == 0:
-            return False
-
-        return True
+            pass
+        else:
+            if self.motion is None:
+                pass
+            else:
+                pass
 
     @property
     def followup_mode(self):
@@ -509,6 +525,36 @@ def digits_to_number(digits):
         number += place * int(d)
         place *= 10
     return number
+
+
+class ViSetMotion(sublime_plugin.TextCommand):
+    def run(self, action, **kwargs):
+        args = {}
+        args['by'] = kwargs.get('by', "characters")
+        args['forward'] = kwargs.get('forward', True)
+        if args['by'] == "WORDS":
+            args['by'] = "stops"
+            args['word_begin'] = True
+            args['empty_line'] = True
+            args['separators'] = ""
+        elif args['by'] == "words":
+            args['by'] = "stops"
+            args['word_begin'] = True
+            args['punct_begin'] = True
+            args['empty_line'] = True
+        elif args['by'] == "paragraphs":
+            args['by'] = "stops"
+            args['word_begin'] = False
+            args['empty_line'] = True
+            args['separators'] = ""
+
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
+            args['extend'] = True
+
+        vintage_state = VintageState(self.view)
+        vintage_state.set_motion(args)
+        vintage_state.run()
+
 
 class ViMove(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
