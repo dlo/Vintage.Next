@@ -133,6 +133,7 @@ class VintageState(object):
             if self.mode_matches_context("vi_mode_visual_all"):
                 self._motion['extend'] = True
 
+            # XXX (dlo): memoize properties like self.count
             repeat_count = self.count
 
             count = 0
@@ -144,12 +145,14 @@ class VintageState(object):
 
                 unchanged_selections = 0
                 for region in self.view.sel():
-                    old_row, _ = self.view.rowcol(self.view.sel()[0].begin())
+                    old_row, _ = self.view.rowcol(region.begin())
                     self.view.run_command("move", self.motion)
-                    new_row, _ = self.view.rowcol(self.view.sel()[0].begin())
+                    new_row, _ = self.view.rowcol(region.begin())
                     if new_row == old_row:
                         unchanged_selections += 1
 
+                # If none of the selections have changed position, end the
+                # motion.
                 if len(self.view.sel()) == unchanged_selections:
                     break
 
