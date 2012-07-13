@@ -119,7 +119,7 @@ class VintageState(object):
 
     @motion.setter
     def motion(self, value):
-        self.motion = value
+        self._motion = value
         self.settings['motion'] = value
 
     def mode_matches_context(self, key):
@@ -127,12 +127,41 @@ class VintageState(object):
 
     def run(self):
         if self.action is None:
-            pass
+            # There was no action, so just move the cursor!
+
+            # Only extend the selections if we're in visual mode.
+            if self.mode_matches_context("vi_mode_visual_all"):
+                self._motion['extend'] = True
+
+            repeat_count = self.count
+
+            count = 0
+            while True:
+                count += 1
+
+                if count > repeat_count:
+                    break
+
+                unchanged_selections = 0
+                for region in self.view.sel():
+                    old_row, _ = self.view.rowcol(self.view.sel()[0].begin())
+                    self.view.run_command("move", self.motion)
+                    new_row, _ = self.view.rowcol(self.view.sel()[0].begin())
+                    if new_row == old_row:
+                        unchanged_selections += 1
+
+                if len(self.view.sel()) == unchanged_selections:
+                    break
+
+            del self.count
+            self.update_status_line()
         else:
             if self.motion is None:
                 pass
             else:
                 if self.action == ACTION_DELETE:
+                    pass
+                else:
                     pass
 
     @property
@@ -611,6 +640,13 @@ class ViPushDigit(sublime_plugin.TextCommand):
 class ViSetAction(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
         vintage_state = VintageState(self.view)
+
+
+class ViSetBeginningCursorLocation(sublime_plugin.TextCommand):
+    pass
+
+class ViSetEndingCursorLocation(sublime_plugin.TextCommand):
+    pass
 
 
 # Set the current motion in the input state. Note that this won't create an
