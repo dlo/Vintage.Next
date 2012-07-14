@@ -33,13 +33,13 @@ class Registers(dict):
     """
 
 
-    def __init__(self, view, settings):
+    def __init__(self, view=None, settings=None):
         self.view = view
         self.settings = settings
 
-    def __get__(self, obj, type):
+    def __get__(self, instance, owner):
         # This ensures that we can easiy access the active view.
-        return Registers(obj.view, obj.settings)
+        return Registers(instance.view, instance.settings)
 
     def _set_default_register(self, value):
         # todo(guillermo): could be made a decorator.
