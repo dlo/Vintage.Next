@@ -1,5 +1,7 @@
 import sublime, sublime_plugin
 import os.path
+from registers import Registers
+from transformer import Transformer
 
 # Normal: Motions apply to all the characters they select
 MOTION_MODE_NORMAL = 0
@@ -84,6 +86,9 @@ class Direction:
 
 
 class VintageState(object):
+    registers = Registers()
+    transformer = Transformer()
+
     def __init__(self, view):
         self.view = view
         self.settings = SublimeSettings(self.view)
@@ -335,7 +340,7 @@ class ViEnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_VISUAL
-        transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
+        transform_region_set(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
 
 class ViEnterSelectMode(sublime_plugin.TextCommand):
@@ -346,7 +351,7 @@ class ViEnterNormalMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_NORMAL
-        transform_selection_regions(self.view, shrink_selection_regions)
+        transform_region_set(self.view, shrink_selection_regions)
 
 
 class ViEnterReplaceMode(sublime_plugin.TextCommand):
@@ -750,30 +755,30 @@ def clip_point_to_line(view, f, pt):
     else:
         return new_pt
 
-def transform_selection(view, f, extend=False, clip_to_line=False):
-    new_sel = []
-    sel = view.sel()
+def transform_selection(view, transformer, extend=False, clip_to_line=False):
+    new_region_set = []
+    region_set = view.sel()
     size = view.size()
 
-    for r in sel:
+    for r in region_set:
         if clip_to_line:
-            new_pt = clip_point_to_line(view, f, r.b)
+            new_pt = clip_point_to_line(view, transformer, r.b)
         else:
-            new_pt = f(r.b)
+            new_pt = transformer(r.b)
 
         if new_pt < 0: new_pt = 0
         elif new_pt > size: new_pt = size
 
         if extend:
-            new_sel.append(sublime.Region(r.a, new_pt))
+            new_region_set.append(sublime.Region(r.a, new_pt))
         else:
-            new_sel.append(sublime.Region(new_pt))
+            new_region_set.append(sublime.Region(new_pt))
 
-    sel.clear()
-    for r in new_sel:
-        sel.add(r)
+    region_set.clear()
+    for region in new_region_set:
+        region_set.add(r)
 
-def transform_selection_regions(view, transformer):
+def transform_region_set(view, transformer):
     new_region_set = []
     region_set = view.sel()
 
@@ -823,7 +828,7 @@ def orient_single_line_region(view, forward, r):
         return r
 
 def set_single_line_selection_direction(view, forward):
-    transform_selection_regions(view,
+    transform_region_set(view,
         lambda r: orient_single_line_region(view, forward, r))
 
 def orient_single_character_region(view, forward, r):
@@ -836,7 +841,7 @@ def orient_single_character_region(view, forward, r):
         return r
 
 def set_single_character_selection_direction(view, forward):
-    transform_selection_regions(view,
+    transform_region_set(view,
         lambda r: orient_single_character_region(view, forward, r))
 
 def clip_empty_selection_to_line_contents(view):
@@ -973,7 +978,7 @@ class ViEval(sublime_plugin.TextCommand):
                         # Expand empty selections include the character
                         # they're on, and to start from the RHS of the
                         # character
-                        transform_selection_regions(self.view,
+                        transform_region_set(self.view,
                             lambda r: sublime.Region(r.b, r.b + 1, r.xpos()) if r.empty() else r)
 
                     self.view.run_command(motion_command, motion_args)
@@ -984,7 +989,7 @@ class ViEval(sublime_plugin.TextCommand):
             # delete the word, but not the newline, while 'w' should advance
             # the caret to the first character of the next line.
             if motion_mode != MOTION_MODE_LINE and action_command and motion_clip_to_line:
-                transform_selection_regions(self.view, lambda r: self.view.split_by_newlines(r)[0])
+                transform_region_set(self.view, lambda r: self.view.split_by_newlines(r)[0])
 
             reindent = False
 
@@ -994,7 +999,7 @@ class ViEval(sublime_plugin.TextCommand):
                     # When lines are deleted before entering insert mode, the
                     # cursor should be left on an empty line. Leave the trailing
                     # newline out of the selection to allow for this.
-                    transform_selection_regions(self.view,
+                    transform_region_set(self.view,
                         lambda r: (sublime.Region(r.begin(), r.end() - 1)
                                    if not r.empty() and self.view.substr(r.end() - 1) == "\n"
                                    else r))
@@ -1009,9 +1014,9 @@ class ViEval(sublime_plugin.TextCommand):
         if not visual_mode:
             # Shrink the selection down to a point
             if motion_inclusive:
-                transform_selection_regions(self.view, shrink_inclusive)
+                transform_region_set(self.view, shrink_inclusive)
             else:
-                transform_selection_regions(self.view, shrink_exclusive)
+                transform_region_set(self.view, shrink_exclusive)
 
         # Clip the selections to the line contents
         if self.view.settings().get('command_mode'):
@@ -1079,7 +1084,7 @@ class EnterVisualMode(sublime_plugin.TextCommand):
         if vintage.motion_mode != MOTION_MODE_NORMAL:
             vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
 
-        transform_selection_regions(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
+        transform_region_set(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
 
 class ExitVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, toggle=False):
@@ -1113,7 +1118,7 @@ class ShrinkSelectionsToBeginning(sublime_plugin.TextCommand):
         return sublime.Region(r.begin())
 
     def run(self, edit, register='"'):
-        transform_selection_regions(self.view, self.shrink)
+        transform_region_set(self.view, self.shrink)
 
 class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
     def shrink(self, r):
@@ -1125,7 +1130,7 @@ class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
             return sublime.Region(end)
 
     def run(self, edit, register='"'):
-        transform_selection_regions(self.view, self.shrink)
+        transform_region_set(self.view, self.shrink)
 
 
 class ViUpperCase(sublime_plugin.TextCommand):
@@ -1174,7 +1179,7 @@ class ViCopy(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
         set_register(self.view, register, forward=True)
         set_register(self.view, '0', forward=True)
-        transform_selection_regions(self.view, shrink_to_first_char)
+        transform_region_set(self.view, shrink_to_first_char)
 
 class ViPrefixableCommand(sublime_plugin.TextCommand):
     # Ensure register and repeat are picked up from vintage, and that
@@ -1352,12 +1357,12 @@ class ViScrollLines(ViPrefixableCommand):
 class ViIndent(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command('indent')
-        transform_selection_regions(self.view, shrink_to_first_char)
+        transform_region_set(self.view, shrink_to_first_char)
 
 class ViUnindent(sublime_plugin.TextCommand):
     def run(self, edit):
         self.view.run_command('unindent')
-        transform_selection_regions(self.view, shrink_to_first_char)
+        transform_region_set(self.view, shrink_to_first_char)
 
 class ViSetBookmark(sublime_plugin.TextCommand):
     def run(self, edit, character):
@@ -1461,3 +1466,9 @@ class MoveGroupFocus(sublime_plugin.WindowCommand):
             self.window.focus_group(matches.next())
         except StopIteration:
             return
+
+class Test(sublime_plugin.TextCommand):
+    def run(self, edit):
+        state = VintageState(self.view)
+        state.transformer.place_cursor_at_beginning()
+
