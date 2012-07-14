@@ -1,7 +1,7 @@
 import re
 import sublime, sublime_plugin
 from vintage import transform_selection
-from vintage import transform_selection_regions
+from vintage import transform_region_set
 
 class ViSpanCountLines(sublime_plugin.TextCommand):
     def run(self, edit, repeat=1):
@@ -40,6 +40,21 @@ class ViMoveToHardEol(sublime_plugin.TextCommand):
 
         transform_selection(self.view, lambda pt: self.view.line(pt).b,
             extend=extend, clip_to_line=False)
+
+
+def transform_region_set(view, transformer):
+    new_region_set = []
+    region_set = view.sel()
+
+    for region in region_set:
+        new_region = transformer(region)
+        if new_region is not None:
+            new_region_set.append(new_region)
+
+    region_set.clear()
+    for region in new_region_set:
+        region_set.add(region)
+
 
 class ViMoveToFirstNonWhiteSpaceCharacter(sublime_plugin.TextCommand):
     def first_character(self, pt):
@@ -256,22 +271,22 @@ def expand_to_whitespace(view, r):
 class ViExpandToWords(sublime_plugin.TextCommand):
     def run(self, edit, outer=False, repeat=1):
         repeat = int(repeat)
-        transform_selection_regions(self.view, lambda r: sublime.Region(r.b + 1, r.b + 1))
+        transform_region_set(self.view, lambda r: sublime.Region(r.b + 1, r.b + 1))
         self.view.run_command("move", {"by": "stops", "extend":False, "forward":False, "word_begin":True, "punct_begin":True})
         for i in xrange(repeat):
             self.view.run_command("move", {"by": "stops", "extend":True, "forward":True, "word_end":True, "punct_end":True})
         if outer:
-            transform_selection_regions(self.view, lambda r: expand_to_whitespace(self.view, r))
+            transform_region_set(self.view, lambda r: expand_to_whitespace(self.view, r))
 
 class ViExpandToBigWords(sublime_plugin.TextCommand):
     def run(self, edit, outer=False, repeat=1):
         repeat = int(repeat)
-        transform_selection_regions(self.view, lambda r: sublime.Region(r.b + 1, r.b + 1))
+        transform_region_set(self.view, lambda r: sublime.Region(r.b + 1, r.b + 1))
         self.view.run_command("move", {"by": "stops", "extend":False, "forward":False, "word_begin":True, "punct_begin":True, "separators": ""})
         for i in xrange(repeat):
             self.view.run_command("move", {"by": "stops", "extend":True, "forward":True, "word_end":True, "punct_end":True, "separators": ""})
         if outer:
-            transform_selection_regions(self.view, lambda r: expand_to_whitespace(self.view, r))
+            transform_region_set(self.view, lambda r: expand_to_whitespace(self.view, r))
 
 class ViExpandToQuotes(sublime_plugin.TextCommand):
     def compare_quote(self, character, p):
@@ -339,9 +354,9 @@ class ViExpandToQuotes(sublime_plugin.TextCommand):
         return expand_to_whitespace(self.view, sublime.Region(a, b))
 
     def run(self, edit, character, outer=False):
-        transform_selection_regions(self.view, lambda r: self.expand_to_quote(character, r))
+        transform_region_set(self.view, lambda r: self.expand_to_quote(character, r))
         if outer:
-            transform_selection_regions(self.view, lambda r: self.expand_to_outer(r))
+            transform_region_set(self.view, lambda r: self.expand_to_outer(r))
 
 class ViExpandToTag(sublime_plugin.TextCommand):
     def run(self, edit, outer=False):
