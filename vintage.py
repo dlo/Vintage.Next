@@ -1188,12 +1188,16 @@ class ViDelete(sublime_plugin.TextCommand):
             self.view.run_command('left_delete')
 
 class ViLeftDelete(sublime_plugin.TextCommand):
-    def run(self, edit, register='"'):
+    def run(self, edit):
         self.view.run_command('left_delete')
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_NORMAL
 
 class ViRightDelete(sublime_plugin.TextCommand):
-    def run(self, edit, register='"'):
+    def run(self, edit):
         self.view.run_command('right_delete')
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_NORMAL
 
 class ViCopy(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
