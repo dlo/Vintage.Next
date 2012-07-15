@@ -21,6 +21,7 @@ def region_transformer(fun):
 
     return inner
 
+sublime.Region.is_reversed = lambda self: self.b < self.a
 
 class Transformer(object):
     def __init__(self, view=None, settings=None):
