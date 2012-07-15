@@ -1181,23 +1181,20 @@ class Sequence(sublime_plugin.TextCommand):
             self.view.run_command(cmd, args)
 
 class ViDelete(sublime_plugin.TextCommand):
-    def run(self, edit, register='"'):
-        if self.view.has_non_empty_selection_region():
-            set_register(self.view, register, forward=False)
-            set_register(self.view, '1', forward=False)
+    def run(self, edit, right=False):
+        vintage_state = VintageState(self.view)
+        vintage_state.action = ACTION_DELETE
+
+        # TODO: move to Vintage State object
+        if direction == "right":
+            self.view.run_command('right_delete')
+        else:
             self.view.run_command('left_delete')
 
-class ViLeftDelete(sublime_plugin.TextCommand):
-    def run(self, edit):
-        self.view.run_command('left_delete')
-        vintage_state = VintageState(self.view)
-        vintage_state.mode = MODE_NORMAL
-
-class ViRightDelete(sublime_plugin.TextCommand):
-    def run(self, edit):
-        self.view.run_command('right_delete')
-        vintage_state = VintageState(self.view)
-        vintage_state.mode = MODE_NORMAL
+        if followup_mode == "normal":
+            vintage_state.mode = MODE_NORMAL
+        elif followup_mode == "visual":
+            vintage_state.mode = MODE_VISUAL
 
 class ViCopy(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):

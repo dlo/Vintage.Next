@@ -105,12 +105,14 @@
   { "keys": ["s"], "command": "vi_change", "args": {"mode": "insert"}, "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["X"],
-    "command": "vi_left_delete",
+    "command": "vi_delete",
+    "args": {"direction": "left"},
     "context": [{"key": "vi_mode_visual_all"}]
   },
 
   { "keys": ["x"],
-    "command": "vi_right_delete",
+    "command": "vi_delete",
+    "args": {"direction": "right"},
     "context": [{"key": "vi_mode_visual_all"}]
   }
 
