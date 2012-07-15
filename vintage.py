@@ -101,10 +101,6 @@ class VintageState(object):
         self._action = self.settings['action']
         self._motion = self.settings['motion']
 
-        # TODO (dlo): handle registers appropriately for commands prepended
-        # with "X, where X is the name of a register
-        # self.target = pass
-
         # This flag is set whenever we should reset the count modifier when
         # accepting digit input.
         self.reset_count = self.settings['reset_count']
@@ -225,7 +221,7 @@ class VintageState(object):
             del self.count
 
         inverse_caret_state = new_mode in (MODE_NORMAL, MODE_VISUAL, MODE_VISUAL_LINE)
-        self.view.settings().set('inverse_caret_state', inverse_caret_state)
+        self.settings['inverse_caret_state'] = inverse_caret_state
         self.update_status_line()
 
     def update_status_line(self):
