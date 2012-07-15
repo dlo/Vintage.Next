@@ -64,7 +64,6 @@ class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
 
 class VintageNextRunDataFileBasedTests(sublime_plugin.WindowCommand):
     def run(self, suite_name):
-        print "XXX XXX XXX XXX"
         self.window.open_file(TEST_DATA_PATH)
 
 
