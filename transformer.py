@@ -33,10 +33,8 @@ class Transformer(object):
             return Transformer(instance.view, instance.settings)
         return Transformer()
 
-    def get_position_of_first_non_whitespace_character(self, region):
-        region = self.place_cursor_at_beginning(iterate=False)(region)
-
-        first_line_region = self.view.line(region.begin())
+    def get_position_of_first_non_whitespace_character(self, pos):
+        first_line_region = self.view.line(pos)
         first_line_string = self.view.substr(first_line_region)
         offset = 0
 
@@ -53,14 +51,14 @@ class Transformer(object):
     @region_transformer
     def expand_region_to_first_non_whitespace_character(self, iterate=True):
         def transformer(region):
-            new_beginning = self.get_position_of_first_non_whitespace_character(region)
-            return sublime.Region(new_beginning, region.end())
+            new_beginning = self.get_position_of_first_non_whitespace_character(region.b)
+            return sublime.Region(region.a, new_beginning)
         return transformer
 
     @region_transformer
     def place_cursor_at_beginning(self, iterate=True):
         def transformer(region):
-            if region.b < region.a:
+            if region.is_reversed():
                 return sublime.Region(region.a, region.b)
             else:
                 return region
@@ -69,7 +67,7 @@ class Transformer(object):
     @region_transformer
     def place_cursor_at_end(self, iterate=True):
         def transformer(region):
-            if region.b > region.a:
+            if not region.is_reversed():
                 return region
             else:
                 return sublime.Region(region.b, region.a)
