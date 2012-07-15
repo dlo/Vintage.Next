@@ -1,8 +1,12 @@
 import sublime
 
-def iterate_over_regions(fun):
-    def inner(self, *args, **kwargs):
+def region_transformer(fun):
+    def inner(self, iterate=True, *args, **kwargs):
         transformer = fun(self, *args, **kwargs)
+
+        if not iterate:
+            return transformer
+
         new_region_set = []
         region_set = self.view.sel()
 
@@ -28,26 +32,30 @@ class Transformer(object):
             return Transformer(instance.view, instance.settings)
         return Transformer()
 
-    @iterate_over_regions
-    def move_cursor_to_first_non_whitespace_character(self):
+    def get_position_of_first_non_whitespace_character(self, region):
+        region = self.place_cursor_at_beginning(iterate=False)(region)
+
+        first_line_region = self.view.line(region.begin())
+        first_line_string = self.view.substr(first_line_region)
+        offset = 0
+
+        for character in first_line_string:
+            if character in (' ', '\t'):
+                offset += 1
+            else:
+                break
+
+        return first_line_region.begin() + offset
+
+    @region_transformer
+    def expand_region_to_first_non_whitespace_character(self):
         def transformer(region):
-            self.place_cursor_at_beginning()(region)
-
-            first_line_region = self.view.line(region.a)
-            first_line_string = self.view.substr(first_point_in_expanded_region)
-            offset = 0
-
-            for character in string_containing_first_point:
-                if c == ' ' or c == '\t':
-                    offset += 1
-                else:
-                    break
-
-            return first_line_region.a + offset
+            new_beginning = self.get_position_of_first_non_whitespace_character(region)
+            return sublime.Region(new_beginning, region.end())
         return transformer
 
-    @iterate_over_regions
-    def place_cursor_at_beginning(self):
+    @region_transformer
+    def place_cursor_at_beginning(self, iterate=True):
         def transformer(region):
             if region.b < region.a:
                 return sublime.Region(region.a, region.b)
@@ -55,7 +63,7 @@ class Transformer(object):
                 return sublime.Region(region.b, region.a)
         return transformer
 
-    @iterate_over_regions
+    @region_transformer
     def place_cursor_at_end(self):
         def transformer(region):
             if region.b > region.a:
@@ -64,7 +72,7 @@ class Transformer(object):
                 return sublime.Region(region.b, region.a)
         return transformer
 
-    @iterate_over_regions
+    @region_transformer
     def expand_to_full_lines(self, include_whitespace=False):
         def transformer(region):
             if include_whitespace:
