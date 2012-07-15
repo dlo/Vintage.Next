@@ -1470,5 +1470,5 @@ class MoveGroupFocus(sublime_plugin.WindowCommand):
 class Test(sublime_plugin.TextCommand):
     def run(self, edit):
         state = VintageState(self.view)
-        state.transformer.place_cursor_at_beginning()
+        state.transformer.expand_region_to_first_non_whitespace_character()
 
