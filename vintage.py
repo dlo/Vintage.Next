@@ -127,14 +127,30 @@ class VintageState(object):
         return MODE_MAPPING[key] & self.mode == self.mode
 
     def run(self):
+        """
+        * If action exists, enter visual mode.
+        * Perform movement if necessary.
+        * Transform selections based on action, if action exists.
+        * Depending on action, exit visual mode and optionally enter insert.
+        """
+
+        if self.action is not None:
+            # Enter visual mode.
+            self.view.run_command("vi_enter_visual_mode")
+
+        if self.action == ACTION_DELETE:
+            pass
+
+        if self.followup_mode is not None:
+            pass
+
         if self.action is None:
             # There was no action, so just move the cursor!
 
-            # Only extend the selections if we're in visual mode.
+            # Extend the selections if we're in visual mode.
             if self.mode_matches_context("vi_mode_visual_all"):
                 self._motion['extend'] = True
 
-            # XXX (dlo): memoize properties like self.count
             repeat_count = self.count
 
             count = 0
@@ -168,6 +184,16 @@ class VintageState(object):
                 else:
                     pass
 
+        if self.mode == MODE_VISUAL_LINE:
+            self.transformer.place_cursor_at_beginning()
+            self.transformer.expand_to_full_lines(include_whitespace=True)
+        elif self.mode == MODE_VISUAL:
+            if self.direction == Direction.LEFT:
+                self.transformer.expand_region_to_minimal_size_from_right()
+            elif self.direction == Direction.RIGHT:
+                self.transformer.expand_region_to_minimal_size_from_left()
+
+
     @property
     def followup_mode(self):
         """ This is extrapolated directly from the action stack """
@@ -184,6 +210,7 @@ class VintageState(object):
 
     @property
     def count(self):
+        # XXX (dlo): memoize properties like this
         if len(self.digits) == 0:
             return 1
         else:
@@ -336,12 +363,21 @@ class ViEnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_VISUAL
-        transform_region_set(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
+        vintage_state.transformer.expand_region_to_minimal_size()
+
+
+class ViEnterVisualLineMode(sublime_plugin.TextCommand):
+    def run(self, edit, **kwargs):
+        vintage_state = VintageState(self.view)
+        vintage_state.mode = MODE_VISUAL_LINE
+        vintage_state.transformer.expand_to_full_lines()
+        vintage_state.transformer.place_cursor_at_beginning()
 
 
 class ViEnterSelectMode(sublime_plugin.TextCommand):
     """ Not implemented """
     pass
+
 
 class ViEnterNormalMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
@@ -353,13 +389,6 @@ class ViEnterNormalMode(sublime_plugin.TextCommand):
 class ViEnterReplaceMode(sublime_plugin.TextCommand):
     """ Not implemented """
     pass
-
-
-class ViEnterVisualLineMode(sublime_plugin.TextCommand):
-    def run(self, edit, **kwargs):
-        vintage_state = VintageState(self.view)
-        vintage_state.mode = MODE_VISUAL_LINE
-        expand_to_full_line(self.view)
 
 
 class ViEnterVirtualReplaceMode(sublime_plugin.TextCommand):

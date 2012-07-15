@@ -46,13 +46,52 @@ class Transformer(object):
             else:
                 break
 
-        return first_line_region.begin() + offset
+        return first_line_region.a + offset
+
+    def get_position_of_first_character(self, pos):
+        row, col = self.view.rowcol(pos)
+        return pos - col
+
+    @region_transformer
+    def expand_region_to_minimal_size(self, iterate=True):
+        def transformer(region):
+            if region.empty():
+                return sublime.Region(region.b, region.b+1)
+            return region
+        return transformer
+
+    @region_transformer
+    def expand_region_to_minimal_size_from_left(self, iterate=True):
+        def transformer(region):
+            if region.empty():
+                fun = self.place_cursor_at_end(iterate=False)
+                return fun(sublime.Region(region.b-1, region.b+1))
+            return region
+        return transformer
+
+    @region_transformer
+    def expand_region_to_minimal_size_from_right(self, iterate=True):
+        def transformer(region):
+            if region.empty():
+                fun = self.place_cursor_at_beginning(iterate=False)
+                return fun(sublime.Region(region.a+1, region.a-1))
+            return region
+        return transformer
 
     @region_transformer
     def expand_region_to_first_non_whitespace_character(self, iterate=True):
         def transformer(region):
-            new_beginning = self.get_position_of_first_non_whitespace_character(region.b)
+            new_beginning = self.get_position_of_first_non_whitespace_character(region.begin())
             return sublime.Region(region.a, new_beginning)
+        return transformer
+
+    @region_transformer
+    def expand_region_to_first_character(self, iterate=True):
+        def transformer(region):
+            if region.b == region.begin():
+                new_beginning = self.get_position_of_first_character(region.begin())
+                return sublime.Region(region.a, new_beginning)
+            return region
         return transformer
 
     @region_transformer
@@ -82,6 +121,7 @@ class Transformer(object):
             else:
                 line_fun = self.view.line
 
+            region = self.place_cursor_at_beginning(iterate=False)(region)
             return line_fun(region)
         return transformer
 
