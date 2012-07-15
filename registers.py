@@ -48,7 +48,7 @@ class Registers(dict):
     def _maybe_set_sys_clipboard(self, value):
         # We actually need to check whether the option is set to a bool; could
         # be any JSON type.
-        if self.settings.vintage_use_sys_clipboard == True:
+        if self.settings['vintage_use_sys_clipboard'] == True:
             sublime.set_clipboard(value)
 
     def set(self, name, value):
@@ -101,7 +101,7 @@ class Registers(dict):
             return
         # Special case lumped among these --user always wants the sys
         # clipboard.
-        elif name == REG_DEFAULT and self.settings.vintage_use_sys_clipboard == True:
+        elif name == REG_DEFAULT and self.settings['vintage_use_sys_clipboard'] == True:
             return sublime.get_clipboard()
 
         # We requested an [a-z0-9"] register.
