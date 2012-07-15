@@ -102,7 +102,17 @@
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["y"], "command": "vi_copy", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["s"], "command": "vi_change", "args": {"mode": "insert"}, "context": [{"key": "vi_mode_motion"}]}
+  { "keys": ["s"], "command": "vi_change", "args": {"mode": "insert"}, "context": [{"key": "vi_mode_motion"}]},
+
+  { "keys": ["X"],
+    "command": "vi_left_delete",
+    "context": [{"key": "vi_mode_visual_all"}]
+  },
+
+  { "keys": ["x"],
+    "command": "vi_right_delete",
+    "context": [{"key": "vi_mode_visual_all"}]
+  }
 
   /*
 
@@ -265,18 +275,6 @@
   },
 
   { "keys": ["r", "<character>"], "command": "replace_character",
-    "context": [{"key": "setting.command_mode"}]
-  },
-
-  { "keys": ["X"], "command": "set_action_motion", "args": {
-    "action": "vi_left_delete",
-    "motion": null },
-    "context": [{"key": "setting.command_mode"}]
-  },
-
-  { "keys": ["x"], "command": "set_action_motion", "args": {
-    "action": "vi_right_delete",
-    "motion": null },
     "context": [{"key": "setting.command_mode"}]
   },
 

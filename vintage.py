@@ -193,6 +193,8 @@ class VintageState(object):
             elif self.direction == Direction.RIGHT:
                 self.transformer.expand_region_to_minimal_size_from_left()
 
+        if self.action is not None:
+            self.mode = self.followup_mode
 
     @property
     def followup_mode(self):
@@ -1187,17 +1189,11 @@ class ViDelete(sublime_plugin.TextCommand):
 
 class ViLeftDelete(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
-        set_register(self.view, register, forward=False)
-        set_register(self.view, '1', forward=False)
         self.view.run_command('left_delete')
-        clip_empty_selection_to_line_contents(self.view)
 
 class ViRightDelete(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
-        set_register(self.view, register, forward=True)
-        set_register(self.view, '1', forward=True)
         self.view.run_command('right_delete')
-        clip_empty_selection_to_line_contents(self.view)
 
 class ViCopy(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
