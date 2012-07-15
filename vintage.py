@@ -196,7 +196,6 @@ class VintageState(object):
 
     @property
     def followup_mode(self):
-        """ This is extrapolated directly from the action stack """
         return self._followup_mode
 
     @property
