@@ -22,6 +22,7 @@ g_executing_test_suite = None
 
 test_suites = {
         'registers': ['vintage_next_run_data_file_based_tests', 'tests.test_registers'],
+        'settings': ['vintage_next_run_data_file_based_tests', 'tests.test_settings'],
 }
 
 
