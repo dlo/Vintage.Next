@@ -40,6 +40,8 @@ class Transformer(object):
         offset = 0
 
         for character in first_line_string:
+            # TODO: Find what other characters also count as whitespace, if
+            # any.
             if character in (' ', '\t'):
                 offset += 1
             else:
@@ -48,7 +50,7 @@ class Transformer(object):
         return first_line_region.begin() + offset
 
     @region_transformer
-    def expand_region_to_first_non_whitespace_character(self):
+    def expand_region_to_first_non_whitespace_character(self, iterate=True):
         def transformer(region):
             new_beginning = self.get_position_of_first_non_whitespace_character(region)
             return sublime.Region(new_beginning, region.end())
@@ -60,22 +62,23 @@ class Transformer(object):
             if region.b < region.a:
                 return sublime.Region(region.a, region.b)
             else:
-                return sublime.Region(region.b, region.a)
+                return region
         return transformer
 
     @region_transformer
-    def place_cursor_at_end(self):
+    def place_cursor_at_end(self, iterate=True):
         def transformer(region):
             if region.b > region.a:
-                return sublime.Region(region.a, region.b)
+                return region
             else:
                 return sublime.Region(region.b, region.a)
         return transformer
 
     @region_transformer
-    def expand_to_full_lines(self, include_whitespace=False):
+    def expand_to_full_lines(self, iterate=True, include_whitespace=False):
         def transformer(region):
             if include_whitespace:
+                # full_line includes trailing newline characters, if they exist
                 line_fun = self.view.full_line
             else:
                 line_fun = self.view.line
