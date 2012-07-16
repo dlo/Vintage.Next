@@ -69,7 +69,6 @@ class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
         print_to_view(self.window.new_file(), bucket.getvalue)
 
 
-
 class VintageNextRunDataFileBasedTests(sublime_plugin.WindowCommand):
     def run(self, suite_name):
         self.window.open_file(TEST_DATA_PATH)
@@ -80,18 +79,17 @@ class TestDataDispatcher(sublime_plugin.EventListener):
         if not tests_state.must_run_tests:
             return
 
-        if view.file_name() and os.path.basename(view.file_name()) == TEST_DATA_FILE_BASENAME:
-            tests_state.test_view = view
+        tests_state.test_view = view
 
-            _, suite_name = test_suites[tests_state.test_suite_to_run]
-            suite = unittest.TestLoader().loadTestsFromName(suite_name)
+        _, suite_name = test_suites[tests_state.test_suite_to_run]
+        suite = unittest.TestLoader().loadTestsFromName(suite_name)
 
-            bucket = StringIO.StringIO()
-            unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
+        bucket = StringIO.StringIO()
+        unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
 
-            tests_state.reset()
+        tests_state.reset()
 
-            v = print_to_view(view.window().new_file(), bucket.getvalue)
-            # In this order, or Sublime Text will fail.
-            v.window().focus_view(view)
-            view.window().run_command('close')
+        v = print_to_view(view.window().new_file(), bucket.getvalue)
+        # In this order, or Sublime Text will fail.
+        v.window().focus_view(view)
+        view.window().run_command('close')
