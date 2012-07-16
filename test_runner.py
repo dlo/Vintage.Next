@@ -10,8 +10,6 @@ import StringIO
 # ********** Remember to enable Vintage.Next or this will not work. ***********
 # /////////////////////////////////////////////////////////////////////////////
 
-# Enables/disables tests.
-DEBUG = True
 TEST_DATA_FILE_BASENAME = 'vintageex_test_data.txt'
 TEST_DATA_PATH = os.path.join(sublime.packages_path(),
                               'Vintage.Next/tests/data/%s' % TEST_DATA_FILE_BASENAME)
@@ -30,8 +28,6 @@ class TestsState(object):
 tests_state = TestsState()
 
 
-g_test_view = None
-
 test_suites = {
         'registers': ['vintage_next_run_data_file_based_tests', 'tests.test_registers'],
         'settings': ['vintage_next_run_data_file_based_tests', 'tests.test_settings'],
@@ -47,8 +43,7 @@ def print_to_view(view, obtain_content):
     return view
 
 
-# class ShowVintageNextTestSuites(sublime_plugin.WindowCommand):
-class ShowMe(sublime_plugin.WindowCommand):
+class DisplayVintageNextTests(sublime_plugin.WindowCommand):
     def run(self):
         self.window.show_quick_panel(sorted(test_suites.keys()), self.run_suite)
 
@@ -63,9 +58,6 @@ class ShowMe(sublime_plugin.WindowCommand):
 
 
 class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
-    def is_enabled(self):
-        return DEBUG
-
     def run(self, suite_name):
         bucket = StringIO.StringIO()
         _, suite = test_suites[suite_name]
