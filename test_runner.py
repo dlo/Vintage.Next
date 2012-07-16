@@ -3,6 +3,7 @@ import sublime_plugin
 
 import os
 import sys
+# todo(guillermooo): maybe allow other test frameworks?
 import unittest
 import StringIO
 
@@ -16,21 +17,47 @@ TEST_DATA_PATH = os.path.join(sublime.packages_path(),
 
 class TestsState(object):
     def __init__(self):
-        self.must_run_tests = False
         self.test_suite_to_run = ''
         self.test_view = None
+        self.test_suite_to_run = ''
+        self._suites = []
+
+    @property
+    def must_run_tests(self):
+        return len(self._suites) != 0
+
+    def add_test_suite(self, name):
+        # TODO(guillermooo): must enforce one type of test only (i.e. with test
+        # data file or without.)
+        self._suites.append(name)
+
+    def iter_module_names(self):
+        for name in self._suites:
+            module_or_modules = test_suites[name][1]
+            if isinstance(module_or_modules, list):
+                for item in module_or_modules:
+                    yield item
+            else:
+                yield module_or_modules
+
+    def run_all(self):
+        for name in self._suites:
+            cmd, _ = test_suites[name]
+            # XXX(guillermooo): this feels like cheating. improve this.
+            sublime.active_window().run_command(cmd, dict(suite_name=name))
 
     def reset(self):
-        self.must_run_tests = False
         self.test_suite_to_run = ''
         self.test_view = None
+        self._suites = []
 
 tests_state = TestsState()
 
-
+# XXX(guillermooo): use named tuples perhaps?
 test_suites = {
         'registers': ['vintage_next_run_data_file_based_tests', 'tests.test_registers'],
         'settings': ['vintage_next_run_data_file_based_tests', 'tests.test_settings'],
+        'all with data file': ['vintage_next_run_data_file_based_tests', ['tests.test_settings', 'tests.test_registers']],
 }
 
 
@@ -45,16 +72,13 @@ def print_to_view(view, obtain_content):
 
 class DisplayVintageNextTests(sublime_plugin.WindowCommand):
     def run(self):
+        tests_state.reset()
         self.window.show_quick_panel(sorted(test_suites.keys()), self.run_suite)
 
     def run_suite(self, idx):
-        tests_state.must_run_tests = True
-
         suite_name = sorted(test_suites.keys())[idx]
-        tests_state.test_suite_to_run = suite_name
-        command_to_run, _ = test_suites[suite_name]
-
-        self.window.run_command(command_to_run, dict(suite_name=suite_name))
+        tests_state.add_test_suite(suite_name)
+        tests_state.run_all()
 
 
 class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
@@ -63,8 +87,6 @@ class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
         _, suite = test_suites[suite_name]
         suite = unittest.defaultTestLoader.loadTestsFromName(suite)
         unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
-
-        tests_state.reset()
 
         print_to_view(self.window.new_file(), bucket.getvalue)
 
@@ -79,17 +101,14 @@ class TestDataDispatcher(sublime_plugin.EventListener):
         if not tests_state.must_run_tests:
             return
 
-        tests_state.test_view = view
+        if os.path.basename(view.file_name()) == TEST_DATA_FILE_BASENAME:
+            tests_state.test_view = view
+            suite = unittest.TestLoader().loadTestsFromNames(tests_state.iter_module_names())
 
-        _, suite_name = test_suites[tests_state.test_suite_to_run]
-        suite = unittest.TestLoader().loadTestsFromName(suite_name)
+            bucket = StringIO.StringIO()
+            unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
 
-        bucket = StringIO.StringIO()
-        unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
-
-        tests_state.reset()
-
-        v = print_to_view(view.window().new_file(), bucket.getvalue)
-        # In this order, or Sublime Text will fail.
-        v.window().focus_view(view)
-        view.window().run_command('close')
+            v = print_to_view(view.window().new_file(), bucket.getvalue)
+            # In this order, or Sublime Text will fail.
+            v.window().focus_view(view)
+            view.window().run_command('close')
