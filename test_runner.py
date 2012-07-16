@@ -72,7 +72,10 @@ class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
         suite = unittest.defaultTestLoader.loadTestsFromName(suite)
         unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
 
+        tests_state.reset()
+
         print_to_view(self.window.new_file(), bucket.getvalue)
+
 
 
 class VintageNextRunDataFileBasedTests(sublime_plugin.WindowCommand):
@@ -82,6 +85,9 @@ class VintageNextRunDataFileBasedTests(sublime_plugin.WindowCommand):
 
 class TestDataDispatcher(sublime_plugin.EventListener):
     def on_load(self, view):
+        if not tests_state.must_run_tests:
+            return
+
         if view.file_name() and os.path.basename(view.file_name()) == TEST_DATA_FILE_BASENAME:
             tests_state.test_view = view
 
