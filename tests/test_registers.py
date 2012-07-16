@@ -2,7 +2,7 @@ import sublime
 
 import unittest
 
-from test_runner import g_test_view
+from test_runner import tests_state
 
 import registers
 
@@ -23,12 +23,12 @@ class RegistersTest(unittest.TestCase):
     def setUp(self):
         self.clipboard_content = sublime.get_clipboard()
         sublime.set_clipboard('')
-        self.settings = Settings(g_test_view)
-        self.registers = registers.Registers(g_test_view, self.settings)
+        self.settings = Settings(tests_state.test_view)
+        self.registers = registers.Registers(tests_state.test_view, self.settings)
 
     def tearDown(self):
         sublime.set_clipboard(self.clipboard_content)
-        g_test_view.settings().erase('vintage_use_sys_clipboard')
+        tests_state.test_view.settings().erase('vintage_use_sys_clipboard')
 
 
 class TestRegistersHelpers(RegistersTest):

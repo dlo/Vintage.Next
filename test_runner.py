@@ -10,15 +10,23 @@ import StringIO
 # ********** Remember to enable Vintage.Next or this will not work. ***********
 # /////////////////////////////////////////////////////////////////////////////
 
-# Enables/disables tests.
-DEBUG = True
 TEST_DATA_FILE_BASENAME = 'vintageex_test_data.txt'
 TEST_DATA_PATH = os.path.join(sublime.packages_path(),
                               'Vintage.Next/tests/data/%s' % TEST_DATA_FILE_BASENAME)
 
+class TestsState(object):
+    def __init__(self):
+        self.must_run_tests = False
+        self.test_suite_to_run = ''
+        self.test_view = None
 
-g_test_view = None
-g_executing_test_suite = None
+    def reset(self):
+        self.must_run_tests = False
+        self.test_suite_to_run = ''
+        self.test_view = None
+
+tests_state = TestsState()
+
 
 test_suites = {
         'registers': ['vintage_next_run_data_file_based_tests', 'tests.test_registers'],
@@ -35,32 +43,31 @@ def print_to_view(view, obtain_content):
     return view
 
 
-# class ShowVintageNextTestSuites(sublime_plugin.WindowCommand):
-class ShowMe(sublime_plugin.WindowCommand):
+class DisplayVintageNextTests(sublime_plugin.WindowCommand):
     def run(self):
         self.window.show_quick_panel(sorted(test_suites.keys()), self.run_suite)
 
     def run_suite(self, idx):
-        global g_executing_test_suite
+        tests_state.must_run_tests = True
 
         suite_name = sorted(test_suites.keys())[idx]
-        g_executing_test_suite = suite_name
+        tests_state.test_suite_to_run = suite_name
         command_to_run, _ = test_suites[suite_name]
 
         self.window.run_command(command_to_run, dict(suite_name=suite_name))
 
 
 class VintageNextRunSimpleTestsCommand(sublime_plugin.WindowCommand):
-    def is_enabled(self):
-        return DEBUG
-
     def run(self, suite_name):
         bucket = StringIO.StringIO()
         _, suite = test_suites[suite_name]
         suite = unittest.defaultTestLoader.loadTestsFromName(suite)
         unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
 
+        tests_state.reset()
+
         print_to_view(self.window.new_file(), bucket.getvalue)
+
 
 
 class VintageNextRunDataFileBasedTests(sublime_plugin.WindowCommand):
@@ -70,15 +77,19 @@ class VintageNextRunDataFileBasedTests(sublime_plugin.WindowCommand):
 
 class TestDataDispatcher(sublime_plugin.EventListener):
     def on_load(self, view):
-        if view.file_name() and os.path.basename(view.file_name()) == TEST_DATA_FILE_BASENAME:
-            global g_test_view
-            g_test_view = view
+        if not tests_state.must_run_tests:
+            return
 
-            _, suite_name = test_suites[g_executing_test_suite]
+        if view.file_name() and os.path.basename(view.file_name()) == TEST_DATA_FILE_BASENAME:
+            tests_state.test_view = view
+
+            _, suite_name = test_suites[tests_state.test_suite_to_run]
             suite = unittest.TestLoader().loadTestsFromName(suite_name)
 
             bucket = StringIO.StringIO()
             unittest.TextTestRunner(stream=bucket, verbosity=1).run(suite)
+
+            tests_state.reset()
 
             v = print_to_view(view.window().new_file(), bucket.getvalue)
             # In this order, or Sublime Text will fail.
