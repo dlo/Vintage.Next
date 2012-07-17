@@ -23,6 +23,15 @@ MODE_VISUAL_LINE = 1 << 11
 
 ACTION_DELETE = 1 << 0
 ACTION_COPY = 1 << 1
+ACTION_PASTE = 1 << 2
+
+SELECTION_CHARACTER = 1 << 0
+SELECTION_LINE = 1 << 1
+
+DIRECTION_UP = 1 << 0
+DIRECTION_RIGHT = 1 << 1
+DIRECTION_DOWN = 1 << 2
+DIRECTION_LEFT = 1 << 3
 
 MODE_MAPPING = {
     'vi_mode_normal': MODE_NORMAL,
@@ -35,6 +44,7 @@ MODE_MAPPING = {
 ACTION_FOLLOWUP_MODES = {
     'q': MODE_NORMAL,
     'r': MODE_NORMAL,
+    'R': MODE_INSERT,
     'o': MODE_INSERT,
     'O': MODE_INSERT,
     'a': MODE_INSERT,
@@ -48,6 +58,10 @@ ACTION_FOLLOWUP_MODES = {
     'c': MODE_INSERT,
     'C': MODE_INSERT,
 }
+
+VISUAL_ACTIONS = ('s', 'D', 'c', 'C', 'x', 'X')
+LINEWISE_ACTIONS = ('o', 'O', 'd', 'D', 'c', 'C', 'S')
+REPEATABLE_ACTIONS = ('R', 'o', 'O', 'a', 'A', 'd', 'D', 'x', 'X', 'c', 'C')
 
 # Registers are used for clipboards and macro storage
 g_registers = {}
@@ -66,23 +80,18 @@ class SublimeSettings(object):
 
 
 class Direction:
-    UP = 1 << 0
-    RIGHT = 1 << 1
-    DOWN = 1 << 2
-    LEFT = 1 << 3
-
     @staticmethod
     def from_motion(motion):
         if motion['forward']:
             if motion['by'] == 'lines':
-                return Direction.DOWN
+                return DIRECTION_DOWN
             else:
-                return Direction.RIGHT
+                return DIRECTION_RIGHT
         else:
             if motion['by'] == 'lines':
-                return Direction.UP
+                return DIRECTION_UP
             else:
-                return Direction.LEFT
+                return DIRECTION_LEFT
 
 
 class VintageState(object):
@@ -93,34 +102,70 @@ class VintageState(object):
         self.view = view
         self.settings = SublimeSettings(self.view)
 
-        # By default, every command is executed once.
-        self.digits = self.settings['digits']
-        if not self.digits:
-            self.digits = []
-
-        self._action = self.settings['action']
-        self._motion = self.settings['motion']
-
+    @property
+    def reset_count(self):
         # This flag is set whenever we should reset the count modifier when
         # accepting digit input.
-        self.reset_count = self.settings['reset_count']
-        if self.reset_count is None:
-            self.reset_count = True
+        value = self.settings['reset_count']
+        if value is None:
+            return True
+        return value
 
-        # This is the mode the editor drops into after performing the action.
-        self._followup_mode = self.settings['followup_mode']
+    @property
+    def digits(self):
+        value = self.settings['digits']
+        if not value:
+            return []
+        return value
+
+    @digits.setter
+    def digits(self, value):
+        self.settings['digits'] = value
+
+    @property
+    def followup_mode(self):
+        value = self.settings['followup_mode']
+        if not value:
+            return MODE_NORMAL
+        return value
+
+    @followup_mode.setter
+    def followup_mode(self, value):
+        self.settings['followup_mode'] = value
 
     @property
     def direction(self):
         return Direction.from_motion(self.motion)
 
     @property
+    def default_selection(self):
+        value = self.settings['default_selection']
+        if not value:
+            return SELECTION_LINE
+        return value
+
+    @default_selection.setter
+    def default_selection(self, value):
+        self.settings['default_selection'] = value
+
+    @property
+    def default_direction(self):
+        value = self.settings['default_direction']
+        if not value:
+            return DIRECTION_DOWN
+        return value
+
+    @default_direction.setter
+    def default_direction(self, value):
+        self.settings['default_direction'] = value
+
+    @property
     def motion(self):
-        return self._motion
+        return self.settings['motion']
 
     @motion.setter
     def motion(self, value):
-        self._motion = value
+        # Encapsulates ST2 motion args
         self.settings['motion'] = value
 
     def mode_matches_context(self, key):
@@ -145,11 +190,13 @@ class VintageState(object):
             pass
 
         if self.action is None:
-            # There was no action, so just move the cursor!
+            # There was no action, so just move the cursor.
 
             # Extend the selections if we're in visual mode.
             if self.mode_matches_context("vi_mode_visual_all"):
-                self._motion['extend'] = True
+                motion = self.motion
+                motion['extend'] = True
+                self.motion = motion
 
             repeat_count = self.count
 
@@ -188,26 +235,23 @@ class VintageState(object):
             self.transformer.place_cursor_at_beginning()
             self.transformer.expand_to_full_lines(include_whitespace=True)
         elif self.mode == MODE_VISUAL:
-            if self.direction == Direction.LEFT:
+            if self.direction == DIRECTION_LEFT:
                 self.transformer.expand_region_to_minimal_size_from_right()
-            elif self.direction == Direction.RIGHT:
+            elif self.direction == DIRECTION_RIGHT:
                 self.transformer.expand_region_to_minimal_size_from_left()
 
         if self.action is not None:
             self.mode = self.followup_mode
 
-    @property
-    def followup_mode(self):
-        return self._followup_mode
+        self.action = None
 
     @property
     def action(self):
-        return self._action
+        return self.settings['action']
 
     @action.setter
-    def action(self, new_action):
-        self.settings['action'] = new_action
-        self._action = new_action
+    def action(self, value):
+        self.settings['action'] = value
 
     @property
     def count(self):
@@ -220,7 +264,6 @@ class VintageState(object):
     @count.deleter
     def count(self):
         self.digits = []
-        self.settings['digits'] = self.digits
         self.update_status_line()
 
     def push_digit(self, digit):
@@ -229,8 +272,9 @@ class VintageState(object):
             self.reset_count = False
             del self.count
 
-        self.digits.append(str(digit))
-        self.settings['digits'] = self.digits
+        digits = self.settings['digits']
+        digits.append(str(digit))
+        self.digits = digits
         self.update_status_line()
 
     @property
@@ -1172,16 +1216,28 @@ class ViLowerCase(sublime_plugin.TextCommand):
         vintage_state = VintageState(self.view)
         vintage_state.mode = MODE_NORMAL
 
-# Sequence is used as part of glue_marked_undo_groups: the marked undo groups
-# are rewritten into a single sequence command, that accepts all the previous
-# commands
-class Sequence(sublime_plugin.TextCommand):
+
+class ViCompound(sublime_plugin.TextCommand):
     def run(self, edit, commands):
-        for cmd, args in commands:
-            self.view.run_command(cmd, args)
+        for command in commands:
+            self.view.run_command(command)
+
+
+class ViD(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        vintage_state.action = ACTION_DELETE
+
+
+class ViC(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        vintage_state.action = ACTION_DELETE
+        vintage_state.followup_mode = MODE_INSERT
+
 
 class ViDelete(sublime_plugin.TextCommand):
-    def run(self, edit, right=False):
+    def run(self, edit, right=False, direction="right", followup_mode="normal"):
         vintage_state = VintageState(self.view)
         vintage_state.action = ACTION_DELETE
 

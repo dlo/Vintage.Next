@@ -98,7 +98,7 @@
 
   { "keys": ["C"],
     "command": "vi_compound",
-    "args": {"commands": ["c", "$"]},
+    "args": {"commands": ["vi_c", "vi_move_to_hard_eol"]},
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["y"], "command": "vi_copy", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
