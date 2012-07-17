@@ -181,7 +181,8 @@ class VintageState(object):
 
         if self.action is not None:
             # Enter visual mode.
-            self.view.run_command("vi_enter_visual_mode")
+            if not self.mode_matches_context("vi_mode_visual_all"):
+                self.view.run_command("vi_enter_visual_mode")
 
         if self.action == ACTION_DELETE:
             pass
@@ -651,19 +652,6 @@ def parse_motion(**kwargs):
         args['separators'] = ""
 
     return args
-
-
-class ViSetMotion(sublime_plugin.TextCommand):
-    def run(self, action, **kwargs):
-        args = parse_motion(**kwargs)
-
-        vintage_state = VintageState(self.view)
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-
-        vintage_state = VintageState(self.view)
-        vintage_state.motion = args
-        vintage_state.run()
 
 
 class ViMove(sublime_plugin.TextCommand):
@@ -1227,6 +1215,46 @@ class ViD(sublime_plugin.TextCommand):
     def run(self, edit):
         vintage_state = VintageState(self.view)
         vintage_state.action = ACTION_DELETE
+
+
+class ViH(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        args = {"forward": False, "by": "characters"}
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
+            args['extend'] = True
+        vintage_state.motion = args
+        vintage_state.run()
+
+
+class ViJ(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        args = {"forward": True, "by": "lines"}
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
+            args['extend'] = True
+        vintage_state.motion = args
+        vintage_state.run()
+
+
+class ViK(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        args = {"forward": False, "by": "lines"}
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
+            args['extend'] = True
+        vintage_state.motion = args
+        vintage_state.run()
+
+
+class ViL(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        args = {"forward": True, "by": "characters"}
+        if vintage_state.mode_matches_context("vi_mode_visual_all"):
+            args['extend'] = True
+        vintage_state.motion = args
+        vintage_state.run()
 
 
 class ViC(sublime_plugin.TextCommand):

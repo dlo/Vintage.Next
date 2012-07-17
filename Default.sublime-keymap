@@ -27,10 +27,10 @@
       { "key": "vi_mode_motion" }
     ]
   },
-  { "keys": ["j"], "command": "vi_set_motion", "context": [{"key": "vi_mode_motion"}], "args": {"forward": true, "by": "lines"}},
-  { "keys": ["k"], "command": "vi_set_motion", "context": [{"key": "vi_mode_motion"}], "args": {"forward": false, "by": "lines"}},
-  { "keys": ["h"], "command": "vi_set_motion", "context": [{"key": "vi_mode_motion"}], "args": {"forward": false, "by": "characters"}},
-  { "keys": ["l"], "command": "vi_set_motion", "context": [{"key": "vi_mode_motion"}], "args": {"forward": true, "by": "characters"}},
+  { "keys": ["h"], "command": "vi_h", "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["j"], "command": "vi_j", "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["k"], "command": "vi_k", "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["l"], "command": "vi_l", "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["G"], "command": "vi_goto_line", "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["w"], "command": "vi_move", "args": {"forward": true, "by": "words"}, "context": [{"key": "vi_mode_motion"}]},
