@@ -1,0 +1,46 @@
+# Basic commands
+################
+#
+# d
+# ACTION_DELETE
+# MODE_NORMAL
+# SELECTION_LINE
+# DIRECTION_DOWN
+#
+# c
+# ACTION_DELETE
+# MODE_INSERT
+# SELECTION_LINE
+# DIRECTION_DOWN
+#
+# y
+# ACTION_COPY
+# MODE_NORMAL
+# SELECTION_LINE
+# DIRECTION_DOWN
+#
+# p
+# ACTION_PASTE
+# MODE_NORMAL
+# SELECTION_CHARACTER
+# DIRECTION_DOWN
+#
+# s
+# ACTION_DELETE
+# MODE_INSERT
+# SELECTION_CHARACTER
+# DIRECTION_RIGHT
+
+# Compound commands
+###################
+# D
+# d + $
+#
+# C
+# c + $
+#
+# Y
+# y + $
+#
+# S
+# vi_move_to_first_non_white_space_character + C
