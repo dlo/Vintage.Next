@@ -654,32 +654,6 @@ def parse_motion(**kwargs):
     return args
 
 
-class ViMove(sublime_plugin.TextCommand):
-    def run(self, action, **kwargs):
-        args = parse_motion(**kwargs)
-
-        vintage_state = VintageState(self.view)
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-
-        repeat_count = vintage_state.count
-
-        count = 0
-        while True:
-            count += 1
-            if count > repeat_count:
-                break
-
-            old_row, _ = self.view.rowcol(self.view.sel()[0].begin())
-            self.view.run_command("move", args)
-            new_row, _ = self.view.rowcol(self.view.sel()[0].begin())
-            if new_row == old_row:
-                break
-
-        del vintage_state.count
-        vintage_state.update_status_line()
-
-
 class ViGotoLine(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
         vintage_state = VintageState(self.view)
