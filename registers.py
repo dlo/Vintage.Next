@@ -14,9 +14,9 @@ REG_SYS_CLIPBOARD_ALL = (REG_SYS_CLIPBOARD_1, REG_SYS_CLIPBOARD_2)
 REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
            REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD_1,
            REG_SYS_CLIPBOARD_2)
-# todo(guillermo): there are more
+# todo(guillermo): There are more.
 
-
+# todo(guillermooo): Subclass dict properly.
 class Registers(dict):
     """
     Registers hold global data mainly used by yank, delete and paste.
@@ -30,6 +30,20 @@ class Registers(dict):
         vstate = VintageState()
         vstate.registers["%"] # now vstate.registers has access to the
                               # current view.
+
+    And this is how you access registers:
+
+    Setting registers...
+
+        vstate.registers['a'] = "foo" # => a == "foo"
+        vstate.registers['A'] = "bar" # => a == "foobar"
+        vstate.registers['1'] = "baz" # => 1 == "baz"
+        vstate.registers[1] = "fizz"  # => 1 == "fizz"
+
+    Retrieving registers...
+
+        vstate.registers['a'] # => "foobar"
+        vstate.registers['A'] # => "foobar" (synonyms)
     """
 
 
