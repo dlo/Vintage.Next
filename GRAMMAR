@@ -40,8 +40,21 @@
 # c + $
 #
 # Y
-# y + $
+# vi_move_to_first_character + y + $
 #
 # S
 # vi_move_to_first_non_white_space_character + c + $
 
+# Sentence Constructions
+########################
+#
+# C -> count
+# A -> action
+# D -> direction
+#
+# CAD - everything provided
+# AD  - count defaults to one
+# ACD - everything provided
+# ACA - direction implied
+# AA  - direction implied and count defaults to one
+#

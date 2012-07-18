@@ -83,29 +83,30 @@
   // Actions
   //
   { "keys": ["d"],
-    "command": "vi_d",
+    "command": "vi_command",
+    "args": {"delete": true},
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["D"],
-    "command": "vi_compound",
+    "command": "vi_compound_command",
     "args": {"commands": ["vi_d", "vi_move_to_hard_eol"]},
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["c"],
     "command": "vi_delete",
-    "args": {"mode": "insert", "forward": true},
+    "args": {"insert": true},
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["C"],
     "command": "vi_compound",
-    "args": {"commands": ["vi_c", "vi_move_to_hard_eol"]},
+    "args": {"commands": ["vi_x", "vi_move_to_hard_eol"]},
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["y"], "command": "vi_copy", "args": {"mode": "normal"}, "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["s"], "command": "vi_change", "args": {"mode": "insert"}, "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["X"],
-    "command": "vi_delete",
+    "command": "vi_compound",
     "args": {"direction": "left"},
     "context": [{"key": "vi_mode_visual_all"}]
   },

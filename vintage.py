@@ -42,13 +42,6 @@ MODE_MAPPING = {
 }
 
 ACTION_FOLLOWUP_MODES = {
-    'q': MODE_NORMAL,
-    'r': MODE_NORMAL,
-    'R': MODE_INSERT,
-    'o': MODE_INSERT,
-    'O': MODE_INSERT,
-    'a': MODE_INSERT,
-    'A': MODE_INSERT,
     'd': MODE_NORMAL,
     'D': MODE_NORMAL,
     's': MODE_INSERT,
@@ -57,7 +50,24 @@ ACTION_FOLLOWUP_MODES = {
     'X': MODE_NORMAL,
     'c': MODE_INSERT,
     'C': MODE_INSERT,
+    'y': MODE_NORMAL,
+    'Y': MODE_NORMAL
 }
+
+ACTION_DIRECTIONS = {
+    'd': DIRECTION_DOWN,
+    'D': DIRECTION_DOWN,
+    's': DIRECTION_RIGHT,
+    'S': DIRECTION_DOWN,
+    'x': DIRECTION_RIGHT,
+    'X': DIRECTION_LEFT,
+    'c': DIRECTION_DOWN,
+    'C': DIRECTION_DOWN,
+    'y': DIRECTION_DOWN,
+    'Y': DIRECTION_DOWN
+}
+
+ACTIONS_REQUIRING_SELECTIONS = ('c', 'd')
 
 VISUAL_ACTIONS = ('s', 'D', 'c', 'C', 'x', 'X')
 LINEWISE_ACTIONS = ('o', 'O', 'd', 'D', 'c', 'C', 'S')
@@ -65,6 +75,35 @@ REPEATABLE_ACTIONS = ('R', 'o', 'O', 'a', 'A', 'd', 'D', 'x', 'X', 'c', 'C')
 
 # Registers are used for clipboards and macro storage
 g_registers = {}
+
+class ViAction(object):
+    def __init__(self, motion=None, line=True, count=1, delete=False,
+            insert=False):
+        """
+        Commands are the foundation of all Vim actions. Every action is an
+        instance of a ViCommand and can fit into the following construct (in
+        the same order).
+
+        1. Initial view motion command. Defaults to identity.
+        2. Enter one of visual mode or visual line mode.
+        3. Perform movement [count] times.
+        4. [optional] Delete selection.
+        5. [optional] Save contents of selection to register.
+        6. Exit visual mode.
+        7. [optional] Enter insert mode.
+        """
+        self.line = line
+        self.count = count
+        self.delete = delete
+        self.insert = insert
+
+    def run(self):
+        if self.delete:
+            self.view.run_command("vi_x")
+
+        if self.insert:
+            self.view.run_command("vi_enter_insert_mode")
+
 
 class SublimeSettings(object):
     """ Helper class for accessing settings values from views """
@@ -135,7 +174,10 @@ class VintageState(object):
 
     @property
     def direction(self):
-        return Direction.from_motion(self.motion)
+        if self.motion is not None:
+            return Direction.from_motion(self.motion)
+        elif self.action is not None:
+            pass
 
     @property
     def default_selection(self):
@@ -180,14 +222,9 @@ class VintageState(object):
         """
 
         if self.action is not None:
-            # Enter visual mode.
-            if not self.mode_matches_context("vi_mode_visual_all"):
-                self.view.run_command("vi_enter_visual_mode")
+            self.view.run_command("vi_enter_visual_mode")
 
-        if self.action == ACTION_DELETE:
-            pass
-
-        if self.followup_mode is not None:
+        if self.action == 'x':
             pass
 
         if self.action is None:
@@ -210,10 +247,10 @@ class VintageState(object):
 
                 unchanged_selections = 0
                 for region in self.view.sel():
-                    old_row, _ = self.view.rowcol(region.begin())
+                    old_rowcol = self.view.rowcol(region.begin())
                     self.view.run_command("move", self.motion)
-                    new_row, _ = self.view.rowcol(region.begin())
-                    if new_row == old_row:
+                    new_rowcol = self.view.rowcol(region.begin())
+                    if old_rowcol == new_rowcol:
                         unchanged_selections += 1
 
                 # If none of the selections have changed position, end the
@@ -242,7 +279,7 @@ class VintageState(object):
                 self.transformer.expand_region_to_minimal_size_from_left()
 
         if self.action is not None:
-            self.mode = self.followup_mode
+            self.mode = ACTION_FOLLOWUP_MODES[self.action]
 
         self.action = None
 
@@ -251,8 +288,18 @@ class VintageState(object):
         return self.settings['action']
 
     @action.setter
-    def action(self, value):
-        self.settings['action'] = value
+    def action(self, new_action):
+        old_action = self.action
+        if new_action is None:
+            self.settings['action'] = new_action
+        elif old_action is None:
+            self.mode = MODE_OP_PENDING
+            self.settings['action'] = new_action
+        elif old_action != new_action:
+            self.mode = MODE_NORMAL
+            self.action = None
+        else:
+            self.run()
 
     @property
     def count(self):
@@ -320,7 +367,7 @@ class VintageState(object):
         elif self.mode == MODE_COMMAND_LINE:
             pass
         elif self.mode == MODE_OP_PENDING:
-            pass
+            desc = ["NORMAL MODE - OP PENDING"]
 
         if self.count is not None:
             desc.append(str(self.count))
@@ -408,8 +455,11 @@ class ViEnterInsertMode(sublime_plugin.TextCommand):
 class ViEnterVisualMode(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
-        vintage_state.mode = MODE_VISUAL
-        vintage_state.transformer.expand_region_to_minimal_size()
+
+        # Only enter visual mode if not already in it.
+        if not vintage_state.mode_matches_context("vi_mode_visual_all"):
+            vintage_state.mode = MODE_VISUAL
+            vintage_state.transformer.expand_region_to_minimal_size()
 
 
 class ViEnterVisualLineMode(sublime_plugin.TextCommand):
@@ -1058,84 +1108,12 @@ class ViEval(sublime_plugin.TextCommand):
         self.view.show(self.view.sel())
 
 
-class EnterInsertMode(sublime_plugin.TextCommand):
-    # Ensure no undo group is created: the only entry on the undo stack should
-    # be the insert_command, if any
-    def run_(self, args):
-        if args:
-            return self.run(**args)
-        else:
-            return self.run()
-
-    def run(self, insert_command=None, insert_args={}, register='"'):
-        # mark_undo_groups_for_gluing allows all commands run while in insert
-        # mode to comprise a single undo group, which is important for '.' to
-        # work as desired.
-        self.view.run_command('maybe_mark_undo_groups_for_gluing')
-        if insert_command:
-            args = insert_args.copy()
-            args.update({'register': register})
-            self.view.run_command(insert_command, args)
-
-        vintage.mode = MODE_INSERT
-
-        self.view.settings().set('command_mode', False)
-        self.view.settings().set('inverse_caret_state', False)
-
-class ExitInsertMode(sublime_plugin.TextCommand):
-    def run_(self, args):
-        edit = self.view.begin_edit(self.name(), args)
-        try:
-            self.run(edit)
-        except:
-            # TODO: What are we catching here?
-            pass
-        finally:
-            self.view.end_edit(edit)
-
-        # Call after end_edit(), to ensure the final entry in the glued undo
-        # group is 'exit_insert_mode'.
-        self.view.run_command('glue_marked_undo_groups')
-
-    def run(self, edit):
-        vintage.mode = MODE_NORMAL
-
-        self.view.settings().set('command_mode', True)
-        self.view.settings().set('inverse_caret_state', True)
-
-        if not self.view.has_non_empty_selection_region():
-            self.view.run_command('vi_move_by_characters_in_line', {'forward': False})
-
-
-class EnterVisualMode(sublime_plugin.TextCommand):
-    def run(self, edit):
-        self.view.run_command('mark_undo_groups_for_gluing')
-
-        vintage.mode = MODE_VISUAL
-
-        if vintage.motion_mode != MOTION_MODE_NORMAL:
-            vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
-
-        transform_region_set(self.view, lambda r: sublime.Region(r.b, r.b + 1) if r.empty() else r)
-
-class ExitVisualMode(sublime_plugin.TextCommand):
-    def run(self, edit, toggle=False):
-        if toggle:
-            if vintage.motion_mode != MOTION_MODE_NORMAL:
-                vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
-            else:
-                self.view.run_command('shrink_selections')
-        else:
-            vintage.set_motion_mode(self.view, MOTION_MODE_NORMAL)
-            self.view.run_command('shrink_selections')
-
-        self.view.run_command('unmark_undo_groups_for_gluing')
 
 class EnterVisualLineMode(sublime_plugin.TextCommand):
     def run(self, edit):
         vintage.set_motion_mode(self.view, MOTION_MODE_LINE)
         expand_to_full_line(self.view)
-        self.view.run_command('maybe_mark_undo_groups_for_gluing')
+
 
 def shrink_selection_regions(r):
     if r.empty():
@@ -1145,12 +1123,14 @@ def shrink_selection_regions(r):
     else:
         return sublime.Region(r.b)
 
+
 class ShrinkSelectionsToBeginning(sublime_plugin.TextCommand):
     def shrink(self, r):
         return sublime.Region(r.begin())
 
     def run(self, edit, register='"'):
         transform_region_set(self.view, self.shrink)
+
 
 class ShrinkSelectionsToEnd(sublime_plugin.TextCommand):
     def shrink(self, r):
@@ -1188,7 +1168,13 @@ class ViCompound(sublime_plugin.TextCommand):
 class ViD(sublime_plugin.TextCommand):
     def run(self, edit):
         vintage_state = VintageState(self.view)
-        vintage_state.action = ACTION_DELETE
+        vintage_state.action = 'd'
+
+
+class ViX(sublime_plugin.TextCommand):
+    def run(self, edit):
+        vintage_state = VintageState(self.view)
+        vintage_state.action = 'x'
 
 
 class ViH(sublime_plugin.TextCommand):
@@ -1234,14 +1220,20 @@ class ViL(sublime_plugin.TextCommand):
 class ViC(sublime_plugin.TextCommand):
     def run(self, edit):
         vintage_state = VintageState(self.view)
-        vintage_state.action = ACTION_DELETE
-        vintage_state.followup_mode = MODE_INSERT
+        vintage_state.action = 'c'
+
+
+class ViSetAction(sublime_plugin.TextCommand):
+    def run(self, edit, action):
+        vintage_state = VintageState(self.view)
+        vintage_state.action = action
+        vintage_state.run()
 
 
 class ViDelete(sublime_plugin.TextCommand):
     def run(self, edit, right=False, direction="right", followup_mode="normal"):
         vintage_state = VintageState(self.view)
-        vintage_state.action = ACTION_DELETE
+        vintage_state.action = 'd'
 
         # TODO: move to Vintage State object
         if direction == "right":
