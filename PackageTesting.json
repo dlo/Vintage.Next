@@ -1,0 +1,12 @@
+{
+  "working_dir": "Vintage.Next",
+  "data": {
+    "main": "tests/data/vintageex_test_data.txt"
+  },
+
+"test_suites": {
+  "registers": ["package_testing_run_data_file_based_tests", "tests.test_registers"],
+  "settings": ["package_testing_run_data_file_based_tests", "tests.test_settings"],
+  "all with data file": ["package_testing_run_data_file_based_tests", ["tests.test_settings", "tests.test_registers"]]
+  }
+}
