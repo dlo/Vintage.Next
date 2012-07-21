@@ -328,11 +328,9 @@ class VintageState(object):
     @property
     def mode(self):
         mode = self.settings['mode']
-        if mode is not None:
-            return mode
-        else:
+        if mode is None:
             self.settings['mode'] = MODE_NORMAL
-        return MODE_NORMAL
+        return mode or MODE_NORMAL
 
     @mode.setter
     def mode(self, new_mode):
