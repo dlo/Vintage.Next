@@ -2,22 +2,27 @@ import sublime
 import os
 
 
-REG_DEFAULT = '"'
+REG_UNNAMED = '"'
 REG_SMALL_DELETE = '-'
-REG_NULL = '_'
+REG_BLACK_HOLE = '_'
 REG_LAST_INSERTED_TEXT = '.'
 REG_FILE_NAME = '%'
 REG_ALT_FILE_NAME = '#'
 REG_SYS_CLIPBOARD_1 = '*'
 REG_SYS_CLIPBOARD_2 = '+'
 REG_SYS_CLIPBOARD_ALL = (REG_SYS_CLIPBOARD_1, REG_SYS_CLIPBOARD_2)
-REG_ALL = (REG_DEFAULT, REG_SMALL_DELETE, REG_NULL, REG_LAST_INSERTED_TEXT,
-           REG_FILE_NAME, REG_ALT_FILE_NAME, REG_SYS_CLIPBOARD_1,
-           REG_SYS_CLIPBOARD_2)
+REG_ALL = (REG_UNNAMED, REG_SMALL_DELETE, REG_BLACK_HOLE,
+           REG_LAST_INSERTED_TEXT, REG_FILE_NAME, REG_ALT_FILE_NAME,
+           REG_SYS_CLIPBOARD_1, REG_SYS_CLIPBOARD_2)
 # todo(guillermo): There are more.
 
+
+# Registers must be available globally, so store here the data.
+_REGISTER_DATA = {}
+
+
 # todo(guillermooo): Subclass dict properly.
-class Registers(dict):
+class Registers(object):
     """
     Registers hold global data mainly used by yank, delete and paste.
 
@@ -47,8 +52,7 @@ class Registers(dict):
     """
 
 
-    def __init__(self, view=None, settings=None, *args, **kwargs):
-        dict.__init__(self, *args, **kwargs)
+    def __init__(self, view=None, settings=None):
         self.view = view
         self.settings = settings
 
@@ -58,7 +62,7 @@ class Registers(dict):
 
     def _set_default_register(self, value):
         # todo(guillermo): could be made a decorator.
-        dict.__setitem__(self, REG_DEFAULT, value)
+        _REGISTER_DATA[REG_UNNAMED] = value
 
     def _maybe_set_sys_clipboard(self, value):
         # We actually need to check whether the option is set to a bool; could
@@ -72,7 +76,7 @@ class Registers(dict):
         """
         assert len(str(name)) == 1, "Register names must be 1 char long."
 
-        if name == REG_NULL:
+        if name == REG_BLACK_HOLE:
             return
 
         if isinstance(name, int):
@@ -82,7 +86,7 @@ class Registers(dict):
             # Vim fails silently.
             # raise Exception("Can only set a-z and 0-9 registers.")
             return None
-        dict.__setitem__(self, name, value)
+        _REGISTER_DATA[name] = value
         self._set_default_register(value)
         self._maybe_set_sys_clipboard(value)
 
@@ -93,17 +97,17 @@ class Registers(dict):
         assert len(name) == 1, "Register names must be 1 char long."
         assert ord(name) in xrange(ord('A'), ord('Z') + 1), "Can only append to A-Z registers."
 
-        existing = dict.get(self, name.lower(), '')
+        existing = _REGISTER_DATA.get(name.lower(), '')
         new_value = existing + value
-        dict.__setitem__(self, name.lower(), new_value)
+        _REGISTER_DATA[name.lower()] = new_value
         self._set_default_register(new_value)
         self._maybe_set_sys_clipboard(new_value)
 
-    def get(self, name=REG_DEFAULT):
+    def get(self, name=REG_UNNAMED):
         assert len(str(name)) == 1, "Register names must be 1 char long."
 
         # Did we request a special register?
-        if name == REG_NULL:
+        if name == REG_BLACK_HOLE:
             return
         elif name == REG_FILE_NAME:
             try:
@@ -112,11 +116,11 @@ class Registers(dict):
                 return ''
         elif name in REG_SYS_CLIPBOARD_ALL:
             return sublime.get_clipboard()
-        elif name != REG_DEFAULT and name in REG_ALL:
+        elif name != REG_UNNAMED and name in REG_ALL:
             return
         # Special case lumped among these --user always wants the sys
         # clipboard.
-        elif name == REG_DEFAULT and self.settings['vintage_use_sys_clipboard'] == True:
+        elif name == REG_UNNAMED and self.settings['vintage_use_sys_clipboard'] == True:
             return sublime.get_clipboard()
 
         # We requested an [a-z0-9"] register.
@@ -124,7 +128,7 @@ class Registers(dict):
             name = unicode(name)
         try:
             # In Vim, "A and "a seem to be synonyms, so accept either.
-            return dict.__getitem__(self, name.lower())
+            return _REGISTER_DATA[name.lower()]
         except KeyError:
             # sublime.status_message("Vintage.Next: E353 Nothing in register %s", name)
             pass

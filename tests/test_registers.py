@@ -34,28 +34,25 @@ class RegistersTest(unittest.TestCase):
 class TestRegistersHelpers(RegistersTest):
     def testCanSetUnnamedRegister(self):
         self.registers._set_default_register("foo")
-        actual = super(type(self.registers),
-                       self.registers).__getitem__(registers.REG_DEFAULT)
+        actual = registers._REGISTER_DATA[registers.REG_UNNAMED]
         self.assertEqual("foo", actual)
 
     def testBlackHoleRegisterWontBeSetEver(self):
-        self.registers.set(registers.REG_NULL, "foo")
+        self.registers.set(registers.REG_BLACK_HOLE, "foo")
         # todo(guillermooo): test this better
-        self.assertEqual(self.registers.__dict__.get(registers.REG_NULL, None), None)
+        self.assertEqual(self.registers.__dict__.get(registers.REG_BLACK_HOLE, None), None)
 
 
 class TestSettingRegisters(RegistersTest):
     def testCanSetLetterRegisters(self):
         self.registers.set("a", "foo")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"), "foo")
+        self.assertEqual(registers._REGISTER_DATA["a"], "foo")
 
     def testCanSetNumberRegisters(self):
         self.registers.set("0", "foo")
         self.registers.set(1, "bar")
-        self.assertEqual(super(type(self.registers),
-                         self.registers).__getitem__("0"), "foo")
-        self.assertEqual(super(type(self.registers),
-                         self.registers).__getitem__("1"), "bar")
+        self.assertEqual(registers._REGISTER_DATA["0"], "foo")
+        self.assertEqual(registers._REGISTER_DATA["1"], "bar")
 
     def testCannotSetUppercaseRegister(self):
         self.registers.set("A", "foo")
@@ -67,24 +64,24 @@ class TestSettingRegisters(RegistersTest):
 
     def testNewlySetRegisterValueIsAlwaysPropagatedToUnnamedRegister(self):
         self.registers.set("a", "foo")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"),
-                         super(type(self.registers), self.registers).__getitem__(registers.REG_DEFAULT))
+        self.assertEqual(registers._REGISTER_DATA["a"],
+                         registers._REGISTER_DATA[registers.REG_UNNAMED])
         self.registers.set("0", "foo")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("0"),
-                         super(type(self.registers), self.registers).__getitem__(registers.REG_DEFAULT))
+        self.assertEqual(registers._REGISTER_DATA["0"],
+                         registers._REGISTER_DATA[registers.REG_UNNAMED])
 
     def testSysClipboardIsSetWhenSettingRegisterIfRequired(self):
         self.settings['vintage_use_sys_clipboard'] = True
         self.registers.set("a", "foo")
         self.assertEqual(sublime.get_clipboard(),
-                         super(type(self.registers), self.registers).__getitem__("a"))
+                         registers._REGISTER_DATA["a"])
 
     def testSettingViaMethodEqualsSettingsViaAttributeAccess(self):
         self.registers["a"] = "foo"
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"),
+        self.assertEqual(registers._REGISTER_DATA["a"],
                          "foo")
         self.registers.set("a", "bar")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"),
+        self.assertEqual(registers._REGISTER_DATA["a"],
                          "bar")
 
 
@@ -99,34 +96,34 @@ class TestAppendingToRegisters(RegistersTest):
     def testCanAppendToRegister(self):
         self.registers.set("a", "foo")
         self.registers.append_to("A", "bar")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"),
+        self.assertEqual(registers._REGISTER_DATA["a"],
                          "foobar")
 
     def testAppendingViaMethodEqualsAppendingViaAttributeAccess(self):
-        super(type(self.registers), self.registers).__setitem__("a", "foo")
+        registers._REGISTER_DATA["a"] = "foo"
         self.registers["A"] = "bar"
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"),
+        self.assertEqual(registers._REGISTER_DATA["a"],
                          "foobar")
-        super(type(self.registers), self.registers).__setitem__("b", "foo")
+        registers._REGISTER_DATA["b"] = "foo"
         self.registers.append_to("B", "bar")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("b"),
+        self.assertEqual(registers._REGISTER_DATA["b"],
                          "foobar")
 
     def testNewlyAppendedValueToRegisterIsAlwaysPropagatedToUnnamedRegister(self):
         self.registers.append_to("A", "foo")
-        self.assertEqual(super(type(self.registers), self.registers).__getitem__("a"),
-                         super(type(self.registers), self.registers).__getitem__(registers.REG_DEFAULT))
+        self.assertEqual(registers._REGISTER_DATA["a"],
+                         registers._REGISTER_DATA[registers.REG_UNNAMED])
 
     def testSysClipboardIsSetWhenAppendingToRegisterIfRequired(self):
         self.settings['vintage_use_sys_clipboard'] = True
         self.registers.append_to("A", "foo")
         self.assertEqual(sublime.get_clipboard(),
-                         super(type(self.registers), self.registers).__getitem__("a"))
+                         registers._REGISTER_DATA["a"])
 
 
 class TestGettingRegisters(RegistersTest):
     def testSetClipboardIfSettingsRequireIt(self):
         self.settings['vintage_use_sys_clipboard'] = True
         sublime.set_clipboard("foo")
-        self.assertEqual(sublime.get_clipboard(), self.registers[registers.REG_DEFAULT])
-        self.assertEqual(sublime.get_clipboard(), self.registers.get(registers.REG_DEFAULT))
+        self.assertEqual(sublime.get_clipboard(), self.registers[registers.REG_UNNAMED])
+        self.assertEqual(sublime.get_clipboard(), self.registers.get(registers.REG_UNNAMED))
