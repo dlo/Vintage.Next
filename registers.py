@@ -47,7 +47,8 @@ class Registers(dict):
     """
 
 
-    def __init__(self, view=None, settings=None):
+    def __init__(self, view=None, settings=None, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
         self.view = view
         self.settings = settings
 
@@ -57,7 +58,7 @@ class Registers(dict):
 
     def _set_default_register(self, value):
         # todo(guillermo): could be made a decorator.
-        self.__dict__[REG_DEFAULT] = value
+        dict.__setitem__(self, REG_DEFAULT, value)
 
     def _maybe_set_sys_clipboard(self, value):
         # We actually need to check whether the option is set to a bool; could
@@ -81,7 +82,7 @@ class Registers(dict):
             # Vim fails silently.
             # raise Exception("Can only set a-z and 0-9 registers.")
             return None
-        self.__dict__[name] = value
+        dict.__setitem__(self, name, value)
         self._set_default_register(value)
         self._maybe_set_sys_clipboard(value)
 
@@ -92,9 +93,9 @@ class Registers(dict):
         assert len(name) == 1, "Register names must be 1 char long."
         assert ord(name) in xrange(ord('A'), ord('Z') + 1), "Can only append to A-Z registers."
 
-        existing = self.__dict__.get(name.lower(), '')
+        existing = dict.get(self, name.lower(), '')
         new_value = existing + value
-        self.__dict__[name.lower()] = new_value
+        dict.__setitem__(self, name.lower(), new_value)
         self._set_default_register(new_value)
         self._maybe_set_sys_clipboard(new_value)
 
@@ -123,7 +124,7 @@ class Registers(dict):
             name = unicode(name)
         try:
             # In Vim, "A and "a seem to be synonyms, so accept either.
-            return self.__dict__[name.lower()]
+            return dict.__getitem__(self, name.lower())
         except KeyError:
             # sublime.status_message("Vintage.Next: E353 Nothing in register %s", name)
             pass
