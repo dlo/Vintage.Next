@@ -74,13 +74,13 @@ class Registers(object):
         """
         Sets an a-z or 0-9 register.
         """
+        # We accept integers as register names.
+        name = str(name)
         assert len(str(name)) == 1, "Register names must be 1 char long."
 
         if name == REG_BLACK_HOLE:
             return
 
-        if isinstance(name, int):
-            name = unicode(name)
         # Special registers and invalid registers won't be set.
         if (not (name.isalpha() or name.isdigit())) or name.isupper():
             # Vim fails silently.
@@ -104,6 +104,8 @@ class Registers(object):
         self._maybe_set_sys_clipboard(new_value)
 
     def get(self, name=REG_UNNAMED):
+        # We accept integers or strings a register names.
+        name = str(name)
         assert len(str(name)) == 1, "Register names must be 1 char long."
 
         # Did we request a special register?
@@ -124,8 +126,6 @@ class Registers(object):
             return sublime.get_clipboard()
 
         # We requested an [a-z0-9"] register.
-        if isinstance(name, int):
-            name = unicode(name)
         try:
             # In Vim, "A and "a seem to be synonyms, so accept either.
             return _REGISTER_DATA[name.lower()]
