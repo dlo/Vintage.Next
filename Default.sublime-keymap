@@ -1,15 +1,5 @@
 [
-  { "keys": ["escape"], "command": "vi_enter_normal_mode",
-    "context": [
-      { "key": "vi_mode_insert" }
-    ]
-  },
-  { "keys": ["ctrl+["], "command": "vi_enter_normal_mode",
-    "context": [
-      { "key": "vi_mode_insert" }
-    ]
-  },
-
+  { "keys": ["ctrl+["], "command": "vi_enter_normal_mode"},
   { "keys": ["escape"], "command": "vi_enter_normal_mode"},
 
   { "keys": ["v"], "command": "vi_enter_visual_mode",
@@ -27,10 +17,10 @@
       { "key": "vi_mode_motion" }
     ]
   },
-  { "keys": ["h"], "command": "vi_h", "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["j"], "command": "vi_j", "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["k"], "command": "vi_k", "context": [{"key": "vi_mode_motion"}]},
-  { "keys": ["l"], "command": "vi_l", "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["h"], "command": "vi_move", "args": {"forward": false}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["j"], "command": "vi_move", "args": {"forward": true, "by": "lines"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["k"], "command": "vi_move", "args": {"forward": false, "by": "lines"}, "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["l"], "command": "vi_move", "args": {"forward": true}, "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["G"], "command": "vi_goto_line", "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["w"], "command": "vi_move", "args": {"forward": true, "by": "words"}, "context": [{"key": "vi_mode_motion"}]},
@@ -83,14 +73,13 @@
   // Actions
   //
   { "keys": ["d"],
-    "command": "vi_command",
-    "args": {"delete": true},
+    "command": "vi_d",
     "context": [{"key": "vi_mode_motion"}]},
 
   { "keys": ["D"],
     "command": "vi_compound_command",
     "args": {"commands": ["vi_d", "vi_move_to_hard_eol"]},
-    "context": [{"key": "vi_mode_motion"}]},
+    "context": [{"key": "vi_mode_normal"}]},
 
   { "keys": ["c"],
     "command": "vi_delete",

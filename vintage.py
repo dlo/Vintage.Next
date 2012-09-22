@@ -162,17 +162,6 @@ class VintageState(object):
         self.settings['digits'] = value
 
     @property
-    def followup_mode(self):
-        value = self.settings['followup_mode']
-        if not value:
-            return MODE_NORMAL
-        return value
-
-    @followup_mode.setter
-    def followup_mode(self, value):
-        self.settings['followup_mode'] = value
-
-    @property
     def direction(self):
         if self.motion is not None:
             return Direction.from_motion(self.motion)
@@ -236,20 +225,35 @@ class VintageState(object):
                 motion['extend'] = True
                 self.motion = motion
 
+            # Store the repeat count in a copy
             repeat_count = self.count
 
+            # This is the number of times the action has actually been executed
             count = 0
+
             while True:
                 count += 1
 
                 if count > repeat_count:
                     break
 
+                # Store the number of selections that haven't changed because
+                # of the action
                 unchanged_selections = 0
+
                 for region in self.view.sel():
+                    # XXX: Need to fix handling of single character regions.
+
                     old_rowcol = self.view.rowcol(region.begin())
+
+                    # Run the motion
                     self.view.run_command("move", self.motion)
+
                     new_rowcol = self.view.rowcol(region.begin())
+
+                    # A rowcol is kind of like a selection coordinate. If it
+                    # hasn't changed, the selection is identical to the
+                    # previous selection.
                     if old_rowcol == new_rowcol:
                         unchanged_selections += 1
 
@@ -258,6 +262,7 @@ class VintageState(object):
                 if len(self.view.sel()) == unchanged_selections:
                     break
 
+            # Reset the repeat count.
             del self.count
             self.update_status_line()
         else:
@@ -280,6 +285,12 @@ class VintageState(object):
 
         if self.action is not None:
             self.mode = ACTION_FOLLOWUP_MODES[self.action]
+
+            if self.action == 'd':
+                if self.direction == DIRECTION_RIGHT:
+                    self.view.run_command('right_delete')
+                elif self.direction == DIRECTION_LEFT:
+                    self.view.run_command('left_delete')
 
         self.action = None
 
@@ -1162,6 +1173,9 @@ class ViCompound(sublime_plugin.TextCommand):
         for command in commands:
             self.view.run_command(command)
 
+        vintage_state = VintageState(self.view)
+        vintage_state.run()
+
 
 class ViD(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -1175,44 +1189,19 @@ class ViX(sublime_plugin.TextCommand):
         vintage_state.action = 'x'
 
 
-class ViH(sublime_plugin.TextCommand):
-    def run(self, edit):
+
+class ViMove(sublime_plugin.TextCommand):
+    def run(self, edit, **kwargs):
         vintage_state = VintageState(self.view)
-        args = {"forward": False, "by": "characters"}
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-        vintage_state.motion = args
+        vintage_state.motion = parse_motion(**kwargs)
         vintage_state.run()
 
 
-class ViJ(sublime_plugin.TextCommand):
+class ViUndo(sublime_plugin.TextCommand):
+    """ XXX: Figure out why this doesn't work """
     def run(self, edit):
-        vintage_state = VintageState(self.view)
-        args = {"forward": True, "by": "lines"}
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-        vintage_state.motion = args
-        vintage_state.run()
-
-
-class ViK(sublime_plugin.TextCommand):
-    def run(self, edit):
-        vintage_state = VintageState(self.view)
-        args = {"forward": False, "by": "lines"}
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-        vintage_state.motion = args
-        vintage_state.run()
-
-
-class ViL(sublime_plugin.TextCommand):
-    def run(self, edit):
-        vintage_state = VintageState(self.view)
-        args = {"forward": True, "by": "characters"}
-        if vintage_state.mode_matches_context("vi_mode_visual_all"):
-            args['extend'] = True
-        vintage_state.motion = args
-        vintage_state.run()
+        self.view.run_command("undo")
+        self.view.run_command("vi_enter_normal_mode")
 
 
 class ViC(sublime_plugin.TextCommand):
@@ -1244,11 +1233,13 @@ class ViDelete(sublime_plugin.TextCommand):
         elif followup_mode == "visual":
             vintage_state.mode = MODE_VISUAL
 
+
 class ViCopy(sublime_plugin.TextCommand):
     def run(self, edit, register='"'):
         set_register(self.view, register, forward=True)
         set_register(self.view, '0', forward=True)
         transform_region_set(self.view, shrink_to_first_char)
+
 
 class ViPrefixableCommand(sublime_plugin.TextCommand):
     # Ensure register and repeat are picked up from vintage, and that
@@ -1273,6 +1264,7 @@ class ViPrefixableCommand(sublime_plugin.TextCommand):
             return self.run(edit, **args)
         finally:
             self.view.end_edit(edit)
+
 
 class ViPasteRight(ViPrefixableCommand):
     def advance(self, pt):
