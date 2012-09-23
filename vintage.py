@@ -233,7 +233,7 @@ class VintageState(object):
 
             # If none of the selections have changed position, end the
             # motion.
-            if zip(old_coords, new_coords) == zip(new_coords, old_coords):
+            if old_coords == new_coords:
                 break
 
         # Reset the repeat count.
