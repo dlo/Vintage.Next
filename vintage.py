@@ -224,16 +224,16 @@ class VintageState(object):
             # of the action
             unchanged_selections = 0
 
-            old_rowcols = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+            old_coords = [self.view.rowcol(region.begin()) for region in self.view.sel()]
 
             # Run the motion
             self.view.run_command("move", self.motion)
 
-            new_rowcols = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+            new_coords = [self.view.rowcol(region.begin()) for region in self.view.sel()]
 
             # If none of the selections have changed position, end the
             # motion.
-            if all(new_rowcol == old_rowcol for new_rowcol, old_rowcol in zip(new_rowcols, old_rowcols)):
+            if zip(old_coords, new_coords) == zip(new_coords, old_coords):
                 break
 
         # Reset the repeat count.
@@ -257,17 +257,7 @@ class VintageState(object):
         if self.action == 'x':
             pass
 
-        if self.action is None:
-            # XXX Pretty sure we need to run the motion regardless of whether or not there is an action.
-            self.run_motion()
-        else:
-            if self.motion is None:
-                pass
-            else:
-                if self.action == ACTION_DELETE:
-                    pass
-                else:
-                    pass
+        self.run_motion()
 
         if self.mode == MODE_VISUAL_LINE:
             self.transformer.place_cursor_at_beginning()
