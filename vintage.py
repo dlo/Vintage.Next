@@ -710,6 +710,16 @@ def parse_motion(**kwargs):
         args['empty_line'] = True
         args['separators'] = ""
 
+    if 'stop_at_end' in kwargs:
+        if 'word_begin' in args:
+            del args['word_begin']
+
+        if 'punct_begin' in args:
+            del args['punct_begin']
+
+        args['word_end'] = True
+        args['punct_end'] = True
+
     return args
 
 
