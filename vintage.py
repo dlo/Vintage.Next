@@ -202,6 +202,45 @@ class VintageState(object):
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
 
+    def run_motion(self):
+        # Extend the selections if we're in visual mode.
+        if self.mode_matches_context("vi_mode_visual_all"):
+            motion = self.motion
+            motion['extend'] = True
+            self.motion = motion
+
+        # Store the repeat count in a copy
+        repeat_count = self.count
+
+        # This is the number of times the action has actually been executed
+        count = 0
+        while True:
+            count += 1
+
+            if count > repeat_count:
+                break
+
+            # Store the number of selections that haven't changed because
+            # of the action
+            unchanged_selections = 0
+
+            old_rowcols = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+
+            # Run the motion
+            self.view.run_command("move", self.motion)
+
+            new_rowcols = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+
+            # If none of the selections have changed position, end the
+            # motion.
+            if all(new_rowcol == old_rowcol for new_rowcol, old_rowcol in zip(new_rowcols, old_rowcols)):
+                break
+
+        # Reset the repeat count.
+        del self.count
+        self.update_status_line()
+
+
     def run(self):
         """
         * If action exists, enter visual mode.
@@ -210,6 +249,8 @@ class VintageState(object):
         * Depending on action, exit visual mode and optionally enter insert.
         """
 
+        # All actions are basically verbs performed on selections, so we enter
+        # visual mode if required.
         if self.action is not None:
             self.view.run_command("vi_enter_visual_mode")
 
@@ -217,54 +258,8 @@ class VintageState(object):
             pass
 
         if self.action is None:
-            # There was no action, so just move the cursor.
-
-            # Extend the selections if we're in visual mode.
-            if self.mode_matches_context("vi_mode_visual_all"):
-                motion = self.motion
-                motion['extend'] = True
-                self.motion = motion
-
-            # Store the repeat count in a copy
-            repeat_count = self.count
-
-            # This is the number of times the action has actually been executed
-            count = 0
-
-            while True:
-                count += 1
-
-                if count > repeat_count:
-                    break
-
-                # Store the number of selections that haven't changed because
-                # of the action
-                unchanged_selections = 0
-
-                for region in self.view.sel():
-                    # XXX: Need to fix handling of single character regions.
-
-                    old_rowcol = self.view.rowcol(region.begin())
-
-                    # Run the motion
-                    self.view.run_command("move", self.motion)
-
-                    new_rowcol = self.view.rowcol(region.begin())
-
-                    # A rowcol is kind of like a selection coordinate. If it
-                    # hasn't changed, the selection is identical to the
-                    # previous selection.
-                    if old_rowcol == new_rowcol:
-                        unchanged_selections += 1
-
-                # If none of the selections have changed position, end the
-                # motion.
-                if len(self.view.sel()) == unchanged_selections:
-                    break
-
-            # Reset the repeat count.
-            del self.count
-            self.update_status_line()
+            # XXX Pretty sure we need to run the motion regardless of whether or not there is an action.
+            self.run_motion()
         else:
             if self.motion is None:
                 pass
@@ -744,11 +739,9 @@ class ViPushDigit(sublime_plugin.TextCommand):
     def run(self, action, **kwargs):
         vintage_state = VintageState(self.view)
         vintage_state.push_digit(kwargs['digit'])
+        if vintage_state.count == 0:
+            print "HI"
 
-
-class ViSetAction(sublime_plugin.TextCommand):
-    def run(self, action, **kwargs):
-        vintage_state = VintageState(self.view)
 
 
 class ViSetBeginningCursorLocation(sublime_plugin.TextCommand):
