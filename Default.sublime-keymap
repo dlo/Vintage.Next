@@ -58,11 +58,13 @@
   },
 
   { "keys": ["o"], "command": "vi_enter_insert_mode", "args":
-    {"action": "run_macro_file", "action_args": {"file": "Packages/Default/Add Line.sublime-macro"} }
+      {"action": "run_macro_file", "action_args": {"file": "Packages/Default/Add Line.sublime-macro"} },
+    "context": [{"key": "vi_mode_normal"}]
   },
 
   { "keys": ["O"], "command": "vi_enter_insert_mode", "args":
-    {"action": "run_macro_file", "action_args": {"file": "Packages/Default/Add Line Before.sublime-macro"} }
+      {"action": "run_macro_file", "action_args": {"file": "Packages/Default/Add Line Before.sublime-macro"} },
+    "context": [{"key": "vi_mode_normal"}]
   },
 
   { "keys": ["u"], "command": "undo", "context": [{"key": "vi_mode_normal"}] },
