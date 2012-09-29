@@ -168,27 +168,6 @@
   { "keys": ["Z", "Z"], "command" : "vi_save_and_exit", "context": [{"key": "setting.command_mode"}] },
 
 
-  { "keys": ["v"], "command": "enter_visual_mode",
-    "context": [{"key": "setting.command_mode"}]
-  },
-  { "keys": ["v"], "command": "exit_visual_mode", "args": {"toggle": true},
-    "context":
-    [
-      {"key": "setting.command_mode"},
-      {"key": "selection_empty", "operator": "equal", "operand": false, "match_all": false}
-    ]
-  },
-
-  { "keys": ["V"], "command": "enter_visual_line_mode",
-    "context": [{"key": "setting.command_mode"}]
-  },
-  { "keys": ["V"], "command": "enter_visual_line_mode",
-    "context":
-    [
-      {"key": "setting.command_mode"},
-      {"key": "vi_motion_mode", "operand": "line"}
-    ]
-  },
   { "keys": ["\"", "<character>"], "command": "set_register",
     "context": [{"key": "setting.command_mode"}]
   },
