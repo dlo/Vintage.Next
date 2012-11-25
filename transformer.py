@@ -30,13 +30,13 @@ def region_transformer(fun):
 sublime.Region.is_reversed = lambda self: self.b < self.a
 
 class Transformer(object):
-    def __init__(self, view=None, settings=None):
+    def __init__(self, view=None, vintage_settings=None):
         self.view = view
-        self.settings = settings
+        self.vintage_settings = vintage_settings
 
     def __get__(self, instance, owner):
         if instance is not None:
-            return Transformer(instance.view, instance.settings)
+            return Transformer(instance.view, instance.vintage_settings)
         return Transformer()
 
     def get_position_of_first_non_whitespace_character(self, pos):
@@ -64,7 +64,8 @@ class Transformer(object):
             if region.empty():
                 # Required so motions know whether the selections have been
                 # modified after the user issued the command.
-                self.settings['count_offset'] = 1
+                log.debug("Modifying region end +1.")
+                self.vintage_settings['count_offset'] = 1
                 return sublime.Region(region.b, region.b+1)
             return region
         return transformer

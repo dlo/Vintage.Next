@@ -265,6 +265,13 @@ class VintageState(object):
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
 
+    def select_native_move_command(self):
+        cmd = 'move'
+        if 'to' in self.motion:
+            cmd = 'move_to'
+        self.log.debug("VintageState - Selecting native motion command (%s)" % cmd)
+        return cmd
+
     def run_motion(self):
         self.log.debug("VintageState - Running motion...")
 
@@ -278,6 +285,7 @@ class VintageState(object):
         # Store the repeat count in a copy
         repeat_count = self.count
         motion = self.motion
+        move_cmd_name = self.select_native_move_command()
 
         # This is the number of times the action has actually been executed
         count = 0
@@ -298,7 +306,7 @@ class VintageState(object):
 
             self.log.debug("VintageState - About to run move command...")
             # Run the motion
-            self.view.run_command("move", motion)
+            self.view.run_command(move_cmd_name, motion)
 
             sels = self.view.sel()
             new_coords = [(r.begin(), r.end()) for r in sels]
@@ -354,7 +362,6 @@ class VintageState(object):
 
             if self.action == 'd':
                 if self.direction == DIRECTION_RIGHT:
-                    # XXX
                     self.view.run_command('right_delete')
                 elif self.direction == DIRECTION_LEFT:
                     self.view.run_command('left_delete')
@@ -394,6 +401,7 @@ class VintageState(object):
         # times in this case. This affects only motions by characters.
         if (self.motion and self.motion.get('by') == 'characters'
                         and self.motion.get('extend')):
+            self.log.debug("VintageState - Decreasing motion count...")
             value -= self.count_offset
 
         return value
@@ -406,7 +414,7 @@ class VintageState(object):
 
     @property
     def count_offset(self):
-        return self.vintage_settings['count_offset']
+        return self.vintage_settings['count_offset'] or 0
 
     @count_offset.setter
     def count_offset(self, value):
@@ -796,6 +804,17 @@ def digits_to_number(digits):
 
 def parse_motion(**kwargs):
     args = {}
+
+    if kwargs.get('to'):
+        # ST move_to command
+        # Some of this parameters are needed by VintageState, but ST doesn't require them
+        # for this command.
+        args['to'] = kwargs.get('to')
+        args['forward'] = kwargs.get('forward', True)
+        args['by'] = kwargs.get('by', 'characters')
+        return args
+
+    # ST move command
     args['by'] = kwargs.get('by', "characters")
     args['forward'] = kwargs.get('forward', True)
     if args['by'] == "WORDS":
@@ -1291,7 +1310,6 @@ class ViCompound(sublime_plugin.TextCommand):
 
 class ViD(sublime_plugin.TextCommand):
     def run(self, edit):
-        # todo: there seems to be a problem setting modes
         log.debug("Running ViD...")
         vintage_state = VintageState(self.view)
         vintage_state.action = 'd'

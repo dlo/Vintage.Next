@@ -22,6 +22,8 @@
   { "keys": ["k"], "command": "vi_move", "args": {"forward": false, "by": "lines"}, "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["l"], "command": "vi_move", "context": [{"key": "vi_mode_motion"}]},
 
+  { "keys": ["$"], "command": "vi_move", "args": { "to": "eol", "forward": true, "by": "lines" }, "context": [{"key": "vi_mode_motion" }] },
+
   { "keys": ["G"], "command": "vi_goto_line", "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["e"], "command": "vi_move", "args": {"stop_at_end": true, "by": "words"}, "context": [{"key": "vi_mode_motion"}]},
   { "keys": ["E"], "command": "vi_move", "args": {"stop_at_end": true, "by": "WORDS"}, "context": [{"key": "vi_mode_motion"}]},
