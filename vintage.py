@@ -27,7 +27,6 @@ MODE_SELECT = 1 << 2
 MODE_INSERT = 1 << 3
 MODE_COMMAND_LINE = 1 << 4
 MODE_EX = 1 << 5
-MODE_OP_PENDING = 1 << 6
 MODE_REPLACE = 1 << 7
 MODE_VIRTUAL_REPLACE = 1 << 8
 MODE_INSERT_NORMAL = 1 << 9
@@ -50,9 +49,9 @@ MODE_MAPPING = {
     'vi_mode_normal': MODE_NORMAL,
     'vi_mode_insert': MODE_INSERT,
     'vi_mode_visual_line': MODE_VISUAL_LINE,
+    'vi_mode_visual': MODE_VISUAL,
     'vi_mode_visual_all': MODE_VISUAL | MODE_VISUAL_LINE,
     'vi_mode_motion': MODE_NORMAL | MODE_VISUAL | MODE_VISUAL_LINE,
-    'vi_mode_op_pending': MODE_OP_PENDING,
 }
 
 
@@ -201,6 +200,10 @@ class VintageState(object):
         self.log.debug("VintageState - Getting reset_count (%s)" % (value))
         return value
 
+    @reset_count.setter
+    def reset_count(self, value):
+        self.vintage_settings['reset_count'] = value
+
     @property
     def digits(self):
         value = self.vintage_settings['digits']
@@ -264,6 +267,7 @@ class VintageState(object):
 
     def run_motion(self):
         self.log.debug("VintageState - Running motion...")
+
         # Extend the selections if we're in visual mode.
         if self.mode_matches_context("vi_mode_visual_all"):
             self.log.debug("VintageState - Running as visual...")
@@ -273,6 +277,7 @@ class VintageState(object):
 
         # Store the repeat count in a copy
         repeat_count = self.count
+        motion = self.motion
 
         # This is the number of times the action has actually been executed
         count = 0
@@ -280,19 +285,24 @@ class VintageState(object):
             count += 1
 
             if count > repeat_count:
+                self.log.debug("Repeat count reached, exiting motion...")
                 break
 
             # Store the number of selections that haven't changed because
             # of the action
             unchanged_selections = 0
 
-            old_coords = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+            sels = self.view.sel()
+            old_coords = [(r.begin(), r.end()) for r in sels]
+            self.log.debug("Old selections: %s" % sels)
 
             self.log.debug("VintageState - About to run move command...")
             # Run the motion
-            self.view.run_command("move", self.motion)
+            self.view.run_command("move", motion)
 
-            new_coords = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+            sels = self.view.sel()
+            new_coords = [(r.begin(), r.end()) for r in sels]
+            self.log.debug("New selections: %s" % sels)
 
             # If none of the selections have changed position, end the
             # motion.
@@ -305,13 +315,14 @@ class VintageState(object):
 
 
     def run(self):
-        self.log.debug("VintageState - Running action...")
         """
         * If action exists, enter visual mode.
         * Perform movement if necessary.
         * Transform selections based on action, if action exists.
         * Depending on action, exit visual mode and optionally enter insert.
         """
+
+        self.log.debug("VintageState - Running action...")
 
         # All actions are basically verbs performed on selections, so we enter
         # visual mode if required.
@@ -343,6 +354,7 @@ class VintageState(object):
 
             if self.action == 'd':
                 if self.direction == DIRECTION_RIGHT:
+                    # XXX
                     self.view.run_command('right_delete')
                 elif self.direction == DIRECTION_LEFT:
                     self.view.run_command('left_delete')
@@ -369,15 +381,36 @@ class VintageState(object):
     @property
     def count(self):
         # XXX (dlo): memoize properties like this
-        if len(self.digits) == 0:
-            return 1
+        digits = self.digits
+        if len(digits) == 0:
+            value = 1
         else:
-            return int("".join(self.digits))
+            value = int("".join(digits))
+        self.log.debug("VintageState - Getting count (%s)" % value)
+
+        # XXX: This is ugly. Fix it.
+        # Vintage may modify the selections after the user has issued his command. This will
+        # happen mainly to enter visual mode. Ensure that we don't run the motion too many
+        # times in this case. This affects only motions by characters.
+        if (self.motion and self.motion.get('by') == 'characters'
+                        and self.motion.get('extend')):
+            value -= self.count_offset
+
+        return value
 
     @count.deleter
     def count(self):
         self.digits = []
+        self.count_offset = 0
         self.update_status_line()
+
+    @property
+    def count_offset(self):
+        return self.vintage_settings['count_offset']
+
+    @count_offset.setter
+    def count_offset(self, value):
+        self.vintage_settings['count_offset'] = value
 
     def push_digit(self, digit):
         if self.reset_count:
