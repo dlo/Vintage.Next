@@ -118,6 +118,26 @@ class SublimeSettings(object):
         self.view.settings().set(key, value)
 
 
+class VintageSettings(object):
+    """ Helper class for accessing settings related to Vintage. """
+
+    def __init__(self, view):
+        self.view = view
+        if not isinstance(self.view.settings().get('vintage'), dict):
+            self.view.settings().set('vintage', dict())
+
+    def __getitem__(self, key):
+        try:
+            return self.view.settings().get('vintage').get(key)
+        except (KeyError, AttributeError):
+            return None
+
+    def __setitem__(self, key, value):
+        setts = self.view.settings().get('vintage')
+        setts[key] = value
+        self.view.settings().set('vintage', setts)
+
+
 class Direction:
     @staticmethod
     def from_motion(motion):
@@ -140,26 +160,27 @@ class VintageState(object):
     def __init__(self, view):
         self.view = view
         self.settings = SublimeSettings(self.view)
+        self.vintage_settings = VintageSettings(self.view)
 
     @property
     def reset_count(self):
         # This flag is set whenever we should reset the count modifier when
         # accepting digit input.
-        value = self.settings['reset_count']
+        value = self.vintage_settings['reset_count']
         if value is None:
             return True
         return value
 
     @property
     def digits(self):
-        value = self.settings['digits']
+        value = self.vintage_settings['digits']
         if not value:
             return []
         return value
 
     @digits.setter
     def digits(self, value):
-        self.settings['digits'] = value
+        self.vintage_settings['digits'] = value
 
     @property
     def direction(self):
@@ -170,34 +191,34 @@ class VintageState(object):
 
     @property
     def default_selection(self):
-        value = self.settings['default_selection']
+        value = self.vintage_settings['default_selection']
         if not value:
             return SELECTION_LINE
         return value
 
     @default_selection.setter
     def default_selection(self, value):
-        self.settings['default_selection'] = value
+        self.vintage_settings['default_selection'] = value
 
     @property
     def default_direction(self):
-        value = self.settings['default_direction']
+        value = self.vintage_settings['default_direction']
         if not value:
             return DIRECTION_DOWN
         return value
 
     @default_direction.setter
     def default_direction(self, value):
-        self.settings['default_direction'] = value
+        self.vintage_settings['default_direction'] = value
 
     @property
     def motion(self):
-        return self.settings['motion']
+        return self.vintage_settings['motion']
 
     @motion.setter
     def motion(self, value):
         # Encapsulates ST2 motion args
-        self.settings['motion'] = value
+        self.vintage_settings['motion'] = value
 
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
@@ -281,16 +302,16 @@ class VintageState(object):
 
     @property
     def action(self):
-        return self.settings['action']
+        return self.vintage_settings['action']
 
     @action.setter
     def action(self, new_action):
         old_action = self.action
         if new_action is None:
-            self.settings['action'] = new_action
+            self.vintage_settings['action'] = new_action
         elif old_action is None:
             self.mode = MODE_OP_PENDING
-            self.settings['action'] = new_action
+            self.vintage_settings['action'] = new_action
         elif old_action != new_action:
             self.mode = MODE_NORMAL
             self.action = None
@@ -312,25 +333,25 @@ class VintageState(object):
 
     def push_digit(self, digit):
         if self.reset_count:
-            self.settings['reset_count'] = False
+            self.vintage_settings['reset_count'] = False
             self.reset_count = False
             del self.count
 
-        digits = self.settings['digits']
+        digits = self.vintage_settings['digits']
         digits.append(str(digit))
         self.digits = digits
         self.update_status_line()
 
     @property
     def mode(self):
-        mode = self.settings['mode']
+        mode = self.vintage_settings['mode']
         if mode is None:
-            self.settings['mode'] = MODE_NORMAL
+            self.vintage_settings['mode'] = MODE_NORMAL
         return mode or MODE_NORMAL
 
     @mode.setter
     def mode(self, new_mode):
-        self.settings['mode'] = new_mode
+        self.vintage_settings['mode'] = new_mode
         if new_mode == MODE_NORMAL:
             del self.count
 
