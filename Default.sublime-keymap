@@ -76,9 +76,7 @@
   //
   // Actions
   //
-  { "keys": ["d"],
-    "command": "vi_d",
-    "context": [{"key": "vi_mode_motion"}]},
+  { "keys": ["d"], "command": "vi_d", "context": [{"key": "vi_mode_normal"}]},
 
   { "keys": ["D"],
     "command": "vi_compound_command",

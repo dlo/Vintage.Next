@@ -14,6 +14,5 @@ def place_cursor_at_end(region):
 
 def expand_to_full_lines(region, include_whitespace=False):
     if include_whitespace:
-        fun = 
-    pass
+        pass
 
