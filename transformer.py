@@ -1,5 +1,9 @@
 import sublime
 
+from vintage_next import logging
+
+log = logging.Logger(prefix="Transformer - ", level=logging.DEBUG)
+
 def region_transformer(fun):
     def inner(self, iterate=True, *args, **kwargs):
         transformer = fun(self, *args, **kwargs)
@@ -11,7 +15,9 @@ def region_transformer(fun):
         region_set = self.view.sel()
 
         for region in region_set:
+            log.debug("Region before transformation: %s" % region)
             new_region = transformer(region)
+            log.debug("Region after transformation: %s" % region)
             if new_region is not None:
                 new_region_set.append(new_region)
 
@@ -24,13 +30,13 @@ def region_transformer(fun):
 sublime.Region.is_reversed = lambda self: self.b < self.a
 
 class Transformer(object):
-    def __init__(self, view=None, settings=None):
+    def __init__(self, view=None, vintage_settings=None):
         self.view = view
-        self.settings = settings
+        self.vintage_settings = vintage_settings
 
     def __get__(self, instance, owner):
         if instance is not None:
-            return Transformer(instance.view, instance.settings)
+            return Transformer(instance.view, instance.vintage_settings)
         return Transformer()
 
     def get_position_of_first_non_whitespace_character(self, pos):
@@ -56,6 +62,10 @@ class Transformer(object):
     def expand_region_to_minimal_size(self, iterate=True):
         def transformer(region):
             if region.empty():
+                # Required so motions know whether the selections have been
+                # modified after the user issued the command.
+                log.debug("Modifying region end +1.")
+                self.vintage_settings['count_offset'] = 1
                 return sublime.Region(region.b, region.b+1)
             return region
         return transformer
@@ -63,10 +73,11 @@ class Transformer(object):
     @region_transformer
     def expand_region_to_minimal_size_from_left(self, iterate=True):
         def transformer(region):
+            rv = region
             if region.empty():
                 fun = self.place_cursor_at_end(iterate=False)
-                return fun(sublime.Region(region.b-1, region.b+1))
-            return region
+                rv = fun(sublime.Region(region.b-1, region.b+1))
+            return rv
         return transformer
 
     @region_transformer

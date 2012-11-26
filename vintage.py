@@ -1,7 +1,20 @@
-import sublime, sublime_plugin
+import sublime
+import sublime_plugin
+
 import os.path
+
 from registers import Registers
 from transformer import Transformer
+
+from vintage_next import logging
+
+
+log = logging.Logger(level=logging.DEBUG, prefix="Vintage.Next: ")
+
+
+print "XXX" * 30
+print "XXX" * 30
+
 
 # Normal: Motions apply to all the characters they select
 MOTION_MODE_NORMAL = 0
@@ -14,7 +27,6 @@ MODE_SELECT = 1 << 2
 MODE_INSERT = 1 << 3
 MODE_COMMAND_LINE = 1 << 4
 MODE_EX = 1 << 5
-MODE_OP_PENDING = 1 << 6
 MODE_REPLACE = 1 << 7
 MODE_VIRTUAL_REPLACE = 1 << 8
 MODE_INSERT_NORMAL = 1 << 9
@@ -37,9 +49,17 @@ MODE_MAPPING = {
     'vi_mode_normal': MODE_NORMAL,
     'vi_mode_insert': MODE_INSERT,
     'vi_mode_visual_line': MODE_VISUAL_LINE,
+    'vi_mode_visual': MODE_VISUAL,
     'vi_mode_visual_all': MODE_VISUAL | MODE_VISUAL_LINE,
     'vi_mode_motion': MODE_NORMAL | MODE_VISUAL | MODE_VISUAL_LINE,
 }
+
+
+def mode_to_str(mode):
+    for k, v in MODE_MAPPING.iteritems():
+        if mode == v:
+            return k
+    return "Unknown mode: %s" % mode
 
 ACTION_FOLLOWUP_MODES = {
     'd': MODE_NORMAL,
@@ -118,6 +138,30 @@ class SublimeSettings(object):
         self.view.settings().set(key, value)
 
 
+class VintageSettings(object):
+    """ Helper class for accessing settings related to Vintage. """
+
+    def __init__(self, view):
+        self.view = view
+        self.log = log
+        if not isinstance(self.view.settings().get('vintage'), dict):
+            self.view.settings().set('vintage', dict())
+
+    def __getitem__(self, key):
+        try:
+            value = self.view.settings().get('vintage').get(key)
+            self.log.debug("VintageSettings - Getting %s (%s)" % (key, value))
+        except (KeyError, AttributeError):
+            value = None
+        return value
+
+    def __setitem__(self, key, value):
+        self.log.debug("VintageSettings - Setting %s to %s" % (key, value))
+        setts = self.view.settings().get('vintage')
+        setts[key] = value
+        self.view.settings().set('vintage', setts)
+
+
 class Direction:
     @staticmethod
     def from_motion(motion):
@@ -138,79 +182,110 @@ class VintageState(object):
     transformer = Transformer()
 
     def __init__(self, view):
+        self.log = log
+        self.log.debug("=" * 80)
+        self.log.debug("Initializing VintageState...")
         self.view = view
         self.settings = SublimeSettings(self.view)
+        self.vintage_settings = VintageSettings(self.view)
+        self.log.debug("VintageState - Mode is currently %s" % mode_to_str(self.mode))
 
     @property
     def reset_count(self):
         # This flag is set whenever we should reset the count modifier when
         # accepting digit input.
-        value = self.settings['reset_count']
+        value = self.vintage_settings['reset_count']
         if value is None:
             return True
+        self.log.debug("VintageState - Getting reset_count (%s)" % (value))
         return value
+
+    @reset_count.setter
+    def reset_count(self, value):
+        self.vintage_settings['reset_count'] = value
 
     @property
     def digits(self):
-        value = self.settings['digits']
+        value = self.vintage_settings['digits']
         if not value:
-            return []
+            value = []
+        self.log.debug("VintageState - Getting digits (%s)." % value)
         return value
 
     @digits.setter
     def digits(self, value):
-        self.settings['digits'] = value
+        self.vintage_settings['digits'] = value
 
     @property
     def direction(self):
+        value = None
         if self.motion is not None:
-            return Direction.from_motion(self.motion)
+            value = Direction.from_motion(self.motion)
         elif self.action is not None:
             pass
 
+        self.log.debug("VintageState - Getting direction (%s)." % value)
+        return value
+
     @property
     def default_selection(self):
-        value = self.settings['default_selection']
+        value = self.vintage_settings['default_selection']
         if not value:
-            return SELECTION_LINE
+            value = SELECTION_LINE
+
+        self.log.debug("VintageState - Getting default_selection (%s)." % value)
         return value
 
     @default_selection.setter
     def default_selection(self, value):
-        self.settings['default_selection'] = value
+        self.vintage_settings['default_selection'] = value
 
     @property
     def default_direction(self):
-        value = self.settings['default_direction']
+        value = self.vintage_settings['default_direction']
         if not value:
-            return DIRECTION_DOWN
+            value = DIRECTION_DOWN
+
+        self.log.debug("VintageState - Getting default_selection (%s)." % value)
         return value
 
     @default_direction.setter
     def default_direction(self, value):
-        self.settings['default_direction'] = value
+        self.vintage_settings['default_direction'] = value
 
     @property
     def motion(self):
-        return self.settings['motion']
+        return self.vintage_settings['motion']
 
     @motion.setter
     def motion(self, value):
         # Encapsulates ST2 motion args
-        self.settings['motion'] = value
+        self.vintage_settings['motion'] = value
 
     def mode_matches_context(self, key):
         return MODE_MAPPING[key] & self.mode == self.mode
 
+    def select_native_move_command(self):
+        cmd = 'move'
+        if 'to' in self.motion:
+            cmd = 'move_to'
+        self.log.debug("VintageState - Selecting native motion command (%s)" % cmd)
+        return cmd
+
     def run_motion(self):
+        self.log.debug("VintageState - Running motion...")
+
         # Extend the selections if we're in visual mode.
         if self.mode_matches_context("vi_mode_visual_all"):
+            self.log.debug("VintageState - Running as visual...")
             motion = self.motion
             motion['extend'] = True
             self.motion = motion
 
         # Store the repeat count in a copy
         repeat_count = self.count
+        motion = self.motion
+        move_cmd_name = self.select_native_move_command()
 
         # This is the number of times the action has actually been executed
         count = 0
@@ -218,18 +293,24 @@ class VintageState(object):
             count += 1
 
             if count > repeat_count:
+                self.log.debug("Repeat count reached, exiting motion...")
                 break
 
             # Store the number of selections that haven't changed because
             # of the action
             unchanged_selections = 0
 
-            old_coords = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+            sels = self.view.sel()
+            old_coords = [(r.begin(), r.end()) for r in sels]
+            self.log.debug("Old selections: %s" % sels)
 
+            self.log.debug("VintageState - About to run move command...")
             # Run the motion
-            self.view.run_command("move", self.motion)
+            self.view.run_command(move_cmd_name, motion)
 
-            new_coords = [self.view.rowcol(region.begin()) for region in self.view.sel()]
+            sels = self.view.sel()
+            new_coords = [(r.begin(), r.end()) for r in sels]
+            self.log.debug("New selections: %s" % sels)
 
             # If none of the selections have changed position, end the
             # motion.
@@ -249,15 +330,21 @@ class VintageState(object):
         * Depending on action, exit visual mode and optionally enter insert.
         """
 
+        self.log.debug("VintageState - Running action...")
+
         # All actions are basically verbs performed on selections, so we enter
         # visual mode if required.
         if self.action is not None:
+            self.log.debug("VintageState - Action found... Entering visual mode...")
             self.view.run_command("vi_enter_visual_mode")
 
         if self.action == 'x':
+            self.log.debug("VintageState - Action is 'x'. Aborting...")
             pass
 
+        self.log.debug("VintageState - Mode before running motion was %s" % mode_to_str(self.mode))
         self.run_motion()
+        self.log.debug("VintageState - Mode after running motion was %s" % mode_to_str(self.mode))
 
         if self.mode == MODE_VISUAL_LINE:
             self.transformer.place_cursor_at_beginning()
@@ -269,7 +356,9 @@ class VintageState(object):
                 self.transformer.expand_region_to_minimal_size_from_left()
 
         if self.action is not None:
-            self.mode = ACTION_FOLLOWUP_MODES[self.action]
+            fup_mode = ACTION_FOLLOWUP_MODES[self.action]
+            self.log.debug("VintageState - Follow up mode is %s" % mode_to_str(fup_mode))
+            self.mode = fup_mode
 
             if self.action == 'd':
                 if self.direction == DIRECTION_RIGHT:
@@ -281,16 +370,15 @@ class VintageState(object):
 
     @property
     def action(self):
-        return self.settings['action']
+        return self.vintage_settings['action']
 
     @action.setter
     def action(self, new_action):
         old_action = self.action
         if new_action is None:
-            self.settings['action'] = new_action
+            self.vintage_settings['action'] = new_action
         elif old_action is None:
-            self.mode = MODE_OP_PENDING
-            self.settings['action'] = new_action
+            self.vintage_settings['action'] = new_action
         elif old_action != new_action:
             self.mode = MODE_NORMAL
             self.action = None
@@ -300,37 +388,62 @@ class VintageState(object):
     @property
     def count(self):
         # XXX (dlo): memoize properties like this
-        if len(self.digits) == 0:
-            return 1
+        digits = self.digits
+        if len(digits) == 0:
+            value = 1
         else:
-            return int("".join(self.digits))
+            value = int("".join(digits))
+        self.log.debug("VintageState - Getting count (%s)" % value)
+
+        # XXX: This is ugly. Fix it.
+        # Vintage may modify the selections after the user has issued his command. This will
+        # happen mainly to enter visual mode. Ensure that we don't run the motion too many
+        # times in this case. This affects only motions by characters.
+        if (self.motion and self.motion.get('by') == 'characters'
+                        and self.motion.get('extend')):
+            self.log.debug("VintageState - Decreasing motion count...")
+            value -= self.count_offset
+
+        return value
 
     @count.deleter
     def count(self):
         self.digits = []
+        self.count_offset = 0
         self.update_status_line()
+
+    @property
+    def count_offset(self):
+        return self.vintage_settings['count_offset'] or 0
+
+    @count_offset.setter
+    def count_offset(self, value):
+        self.vintage_settings['count_offset'] = value
 
     def push_digit(self, digit):
         if self.reset_count:
-            self.settings['reset_count'] = False
+            self.vintage_settings['reset_count'] = False
             self.reset_count = False
             del self.count
 
-        digits = self.settings['digits']
+        digits = self.vintage_settings['digits']
         digits.append(str(digit))
         self.digits = digits
         self.update_status_line()
 
     @property
     def mode(self):
-        mode = self.settings['mode']
+        mode = self.vintage_settings['mode']
         if mode is None:
-            self.settings['mode'] = MODE_NORMAL
-        return mode or MODE_NORMAL
+            self.vintage_settings['mode'] = MODE_NORMAL
+        value = mode or MODE_NORMAL
+        self.log.debug("VintageState - Getting mode (%s)." % mode_to_str(value))
+        return mode
 
     @mode.setter
     def mode(self, new_mode):
-        self.settings['mode'] = new_mode
+        self.vintage_settings['mode'] = new_mode
+        self.log.debug("VintageState - Setting mode to '%s'." % mode_to_str(new_mode))
         if new_mode == MODE_NORMAL:
             del self.count
 
@@ -339,9 +452,13 @@ class VintageState(object):
         self.update_status_line()
 
     def update_status_line(self):
+        self.log.debug("VintageState - Updating status line...")
         desc = []
         if self.mode == MODE_NORMAL:
-            desc = ["NORMAL MODE"]
+            if self.action and not self.motion:
+                desc = ["NORMAL MODE - OP PENDING"]
+            else:
+                desc = ["NORMAL MODE"]
         elif self.mode == MODE_VISUAL:
             desc = ["VISUAL MODE"]
         elif self.mode == MODE_VISUAL_LINE:
@@ -360,8 +477,8 @@ class VintageState(object):
             pass
         elif self.mode == MODE_COMMAND_LINE:
             pass
-        elif self.mode == MODE_OP_PENDING:
-            desc = ["NORMAL MODE - OP PENDING"]
+        # elif self.mode == MODE_OP_PENDING:
+        #     desc = ["NORMAL MODE - OP PENDING"]
 
         if self.count is not None:
             desc.append(str(self.count))
@@ -505,6 +622,16 @@ class ViEnterOpPendingMode(sublime_plugin.TextCommand):
 # Called when the plugin is unloaded (e.g., perhaps it just got added to
 # ignored_packages). Ensure files aren't left in command mode.
 def unload_handler():
+    # FOR DEBUG ONLY ========================
+    log.empty()
+    print "ZZZ" * 30
+    print "ZZZ" * 30
+    sublime.log_commands(True)
+    for w in sublime.windows():
+        for v in w.views():
+            v.settings().set('vintage', {})
+    # =======================================
+    # DON'T DELETE THE FOLLOWING -- LEGIT LINE
     vintage.reset_all()
 
 # Ensures the input state is reset when the view changes, or the user selects
@@ -677,6 +804,17 @@ def digits_to_number(digits):
 
 def parse_motion(**kwargs):
     args = {}
+
+    if kwargs.get('to'):
+        # ST move_to command
+        # Some of this parameters are needed by VintageState, but ST doesn't require them
+        # for this command.
+        args['to'] = kwargs.get('to')
+        args['forward'] = kwargs.get('forward', True)
+        args['by'] = kwargs.get('by', 'characters')
+        return args
+
+    # ST move command
     args['by'] = kwargs.get('by', "characters")
     args['forward'] = kwargs.get('forward', True)
     if args['by'] == "WORDS":
@@ -1172,6 +1310,7 @@ class ViCompound(sublime_plugin.TextCommand):
 
 class ViD(sublime_plugin.TextCommand):
     def run(self, edit):
+        log.debug("Running ViD...")
         vintage_state = VintageState(self.view)
         vintage_state.action = 'd'
 
